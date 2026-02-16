@@ -21,7 +21,7 @@ async function fetchRouteFromGoogle(origin, destination) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Goog-Api-Key': 'AIzaSyB0Ub-b96mTY38dEnor0h6FMeThJQdTmHA',
+        'X-Goog-Api-Key': process.env.GOOGLE_ROUTES_API_KEY,
         'X-Goog-FieldMask': 'routes.legs.steps.startLocation,routes.legs.steps.endLocation'
       },
       body: JSON.stringify({

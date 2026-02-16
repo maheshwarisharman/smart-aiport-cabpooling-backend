@@ -2,481 +2,127 @@ export const dataSet = [
   {
     "latitude": 28.6562,
     "longitude": 77.2410,
+    "no_of_passengers": 1,
+    "luggage": 1,
     "name": "RedFort"
   },
   {
     "latitude": 28.6129,
     "longitude": 77.2295,
+    "no_of_passengers": 1,
+    "luggage": 1,
     "name": "IndiaGate"
   },
   {
     "latitude": 28.5244,
     "longitude": 77.1855,
+    "no_of_passengers": 1,
+    "luggage": 1,
     "name": "QutubMinar"
   },
   {
     "latitude": 28.5933,
     "longitude": 77.2507,
-    "name": "HumayunsTomb"
+    "name": "HumayunsTomb",
+    "no_of_passengers": 1,
+    "luggage": 1,
   },
   {
     "latitude": 28.5535,
     "longitude": 77.2588,
-    "name": "LotusTemple"
+    "name": "LotusTemple",
+    "no_of_passengers": 1,
+    "luggage": 1,
   },
   {
     "latitude": 28.6127,
     "longitude": 77.2773,
-    "name": "AkshardhamTemple"
+    "name": "AkshardhamTemple",
+    "no_of_passengers": 1,
+    "luggage": 1,
   },
   {
     "latitude": 28.6507,
     "longitude": 77.2334,
-    "name": "JamaMasjid"
+    "name": "JamaMasjid",
+    "no_of_passengers": 1,
+    "luggage": 1,
   },
   {
     "latitude": 28.6271,
     "longitude": 77.2166,
-    "name": "JantarMantar"
+    "name": "JantarMantar",
+    "no_of_passengers": 1,
+    "luggage": 1,
   },
   {
     "latitude": 28.6143,
     "longitude": 77.1994,
-    "name": "RashtrapatiBhavan"
+    "name": "RashtrapatiBhavan",
+    "no_of_passengers": 1,
+    "luggage": 1,
   },
   {
     "latitude": 28.6328,
     "longitude": 77.2197,
-    "name": "ConnaughtPlace"
+    "name": "ConnaughtPlace",
+    "no_of_passengers": 1,
+    "luggage": 1,
   },
   {
     "latitude": 28.6096,
     "longitude": 77.2435,
-    "name": "PuranaQila"
+    "name": "PuranaQila",
+    "no_of_passengers": 1,
+    "luggage": 1,
   },
   {
     "latitude": 28.5893,
     "longitude": 77.2106,
-    "name": "SafdarjungTomb"
+    "name": "SafdarjungTomb",
+    "no_of_passengers": 1,
+    "luggage": 1,
   },
   {
     "latitude": 28.5931,
     "longitude": 77.2197,
-    "name": "LodhiGardens"
+    "name": "LodhiGardens",
+    "no_of_passengers": 1,
+    "luggage": 1,
   },
   {
     "latitude": 28.6266,
     "longitude": 77.2250,
-    "name": "AgrasenKiBaoli"
+    "name": "AgrasenKiBaoli",
+    "no_of_passengers": 1,
+    "luggage": 1,
   },
   {
     "latitude": 28.6406,
     "longitude": 77.2494,
-    "name": "RajGhat"
+    "name": "RajGhat",
+    "no_of_passengers": 1,
+    "luggage": 1,
   },
   {
     "latitude": 28.6296,
     "longitude": 77.2114,
-    "name": "BanglaSahibGurudwara"
+    "name": "BanglaSahibGurudwara",
+    "no_of_passengers": 1,
+    "luggage": 1,
   },
   {
     "latitude": 28.5562,
     "longitude": 77.2410,
-    "name": "ISKCONTempleDelhi"
+    "name": "ISKCONTempleDelhi",
+    "no_of_passengers": 1,
+    "luggage": 1,
   },
   {
     "latitude": 28.5083,
     "longitude": 77.1724,
-    "name": "ChattarpurMandir"
-  },
-  {
-    "latitude": 28.6338,
-    "longitude": 77.1996,
-    "name": "LaxminarayanTemple"
-  },
-  {
-    "latitude": 28.6300,
-    "longitude": 77.2086,
-    "name": "SacredHeartCathedral"
-  },
-  {
-    "latitude": 28.5450,
-    "longitude": 77.1926,
-    "name": "HauzKhasFort"
-  },
-  {
-    "latitude": 28.5134,
-    "longitude": 77.2618,
-    "name": "TughlaqabadFort"
-  },
-  {
-    "latitude": 28.5721,
-    "longitude": 77.2058,
-    "name": "SafdarjungHospital"
-  },
-  {
-    "latitude": 28.5672,
-    "longitude": 77.2100,
-    "name": "AIIMS"
-  },
-  {
-    "latitude": 28.6371,
-    "longitude": 77.2384,
-    "name": "LokNayakHospital"
-  },
-  {
-    "latitude": 28.6384,
-    "longitude": 77.1896,
-    "name": "SirGangaRamHospital"
-  },
-  {
-    "latitude": 28.6253,
-    "longitude": 77.1936,
-    "name": "RMLHospital"
-  },
-  {
-    "latitude": 28.5828,
-    "longitude": 77.1565,
-    "name": "DhaulaKuan"
-  },
-  {
-    "latitude": 28.5566,
-    "longitude": 77.0997,
-    "name": "IGIAirportT3"
-  },
-  {
-    "latitude": 28.5686,
-    "longitude": 77.1121,
-    "name": "DelhiAerocity"
-  },
-  {
-    "latitude": 28.6429,
-    "longitude": 77.2191,
-    "name": "NewDelhiRailwayStation"
-  },
-  {
-    "latitude": 28.6606,
-    "longitude": 77.2285,
-    "name": "OldDelhiRailwayStation"
-  },
-  {
-    "latitude": 28.5866,
-    "longitude": 77.2505,
-    "name": "NizamuddinRailwayStation"
-  },
-  {
-    "latitude": 28.6672,
-    "longitude": 77.2300,
-    "name": "KashmereGateISBT"
-  },
-  {
-    "latitude": 28.6469,
-    "longitude": 77.3160,
-    "name": "AnandViharISBT"
-  },
-  {
-    "latitude": 28.5912,
-    "longitude": 77.2586,
-    "name": "SaraiKaleKhanISBT"
-  },
-  {
-    "latitude": 28.5448,
-    "longitude": 77.1914,
-    "name": "IITDelhi"
-  },
-  {
-    "latitude": 28.5398,
-    "longitude": 77.1664,
-    "name": "JNU"
-  },
-  {
-    "latitude": 28.6904,
-    "longitude": 77.2072,
-    "name": "DelhiUniversityNorth"
-  },
-  {
-    "latitude": 28.5616,
-    "longitude": 77.2802,
-    "name": "JamiaMilliaIslamia"
-  },
-  {
-    "latitude": 28.6093,
-    "longitude": 77.0360,
-    "name": "NSUT"
-  },
-  {
-    "latitude": 28.7499,
-    "longitude": 77.1171,
-    "name": "DTU"
-  },
-  {
-    "latitude": 28.5456,
-    "longitude": 77.2732,
-    "name": "IIITDelhi"
-  },
-  {
-    "latitude": 28.6219,
-    "longitude": 77.2144,
-    "name": "RajivChowkMetro"
-  },
-  {
-    "latitude": 28.6560,
-    "longitude": 77.2301,
-    "name": "ChandniChowk"
-  },
-  {
-    "latitude": 28.6508,
-    "longitude": 77.1895,
-    "name": "KarolBagh"
-  },
-  {
-    "latitude": 28.6366,
-    "longitude": 77.2753,
-    "name": "LaxmiNagar"
-  },
-  {
-    "latitude": 28.5555,
-    "longitude": 77.0573,
-    "name": "DwarkaSector21"
-  },
-  {
-    "latitude": 28.6180,
-    "longitude": 77.2081,
-    "name": "CentralSecretariat"
-  },
-  {
-    "latitude": 28.5744,
-    "longitude": 77.2096,
-    "name": "INAMarket"
-  },
-  {
-    "latitude": 28.5467,
-    "longitude": 77.2514,
-    "name": "KalkaJiMandir"
-  },
-  {
-    "latitude": 28.6015,
-    "longitude": 77.2269,
-    "name": "KhanMarket"
-  },
-  {
-    "latitude": 28.5768,
-    "longitude": 77.1953,
-    "name": "SarojiniNagar"
-  },
-  {
-    "latitude": 28.5693,
-    "longitude": 77.2435,
-    "name": "LajpatNagar"
-  },
-  {
-    "latitude": 28.5317,
-    "longitude": 77.2194,
-    "name": "SelectCitywalk"
-  },
-  {
-    "latitude": 28.5422,
-    "longitude": 77.1557,
-    "name": "DLFPromenade"
-  },
-  {
-    "latitude": 28.5413,
-    "longitude": 77.1528,
-    "name": "DLFEmporio"
-  },
-  {
-    "latitude": 28.5416,
-    "longitude": 77.1472,
-    "name": "AmbienceMallVasantKunj"
-  },
-  {
-    "latitude": 28.6425,
-    "longitude": 77.1065,
-    "name": "PacificMallTagoreGarden"
-  },
-  {
-    "latitude": 28.6053,
-    "longitude": 77.0308,
-    "name": "VegasMallDwarka"
-  },
-  {
-    "latitude": 28.6588,
-    "longitude": 77.2941,
-    "name": "CrossRiverMall"
-  },
-  {
-    "latitude": 28.6253,
-    "longitude": 77.1186,
-    "name": "JanakpuriDistrictCentre"
-  },
-  {
-    "latitude": 28.6997,
-    "longitude": 77.1356,
-    "name": "NetajiSubhashPlace"
-  },
-  {
-    "latitude": 28.5946,
-    "longitude": 77.2452,
-    "name": "SunderNursery"
-  },
-  {
-    "latitude": 28.5132,
-    "longitude": 77.1982,
-    "name": "GardenOfFiveSenses"
-  },
-  {
-    "latitude": 28.5879,
-    "longitude": 77.1892,
-    "name": "NehruPark"
-  },
-  {
-    "latitude": 28.5583,
-    "longitude": 77.1923,
-    "name": "DeerPark"
-  },
-  {
-    "latitude": 28.5303,
-    "longitude": 77.1705,
-    "name": "SanjayVan"
-  },
-  {
-    "latitude": 28.5898,
-    "longitude": 77.2424,
-    "name": "JawaharlalNehruStadium"
-  },
-  {
-    "latitude": 28.6373,
-    "longitude": 77.2415,
-    "name": "ArunJaitleyStadium"
-  },
-  {
-    "latitude": 28.6291,
-    "longitude": 77.2519,
-    "name": "IndiraGandhiIndoorStadium"
-  },
-  {
-    "latitude": 28.6310,
-    "longitude": 77.1751,
-    "name": "TalkatoraStadium"
-  },
-  {
-    "latitude": 28.6133,
-    "longitude": 77.2361,
-    "name": "NationalStadium"
-  },
-  {
-    "latitude": 28.6151,
-    "longitude": 77.2057,
-    "name": "ParliamentHouse"
-  },
-  {
-    "latitude": 28.6137,
-    "longitude": 77.2413,
-    "name": "SupremeCourt"
-  },
-  {
-    "latitude": 28.6163,
-    "longitude": 77.2281,
-    "name": "DelhiHighCourt"
-  },
-  {
-    "latitude": 28.6139,
-    "longitude": 77.2023,
-    "name": "NorthBlock"
-  },
-  {
-    "latitude": 28.6128,
-    "longitude": 77.2027,
-    "name": "SouthBlock"
-  },
-  {
-    "latitude": 28.6443,
-    "longitude": 77.2541,
-    "name": "ShantiVana"
-  },
-  {
-    "latitude": 28.6472,
-    "longitude": 77.2483,
-    "name": "VijayGhat"
-  },
-  {
-    "latitude": 28.6397,
-    "longitude": 77.2582,
-    "name": "ShaktiSthal"
-  },
-  {
-    "latitude": 28.6044,
-    "longitude": 77.2238,
-    "name": "TajMahalHotel"
-  },
-  {
-    "latitude": 28.5997,
-    "longitude": 77.2403,
-    "name": "TheOberoi"
-  },
-  {
-    "latitude": 28.6190,
-    "longitude": 77.2185,
-    "name": "LeMeridien"
-  },
-  {
-    "latitude": 28.6214,
-    "longitude": 77.2184,
-    "name": "ShangriLaEros"
-  },
-  {
-    "latitude": 28.5982,
-    "longitude": 77.1916,
-    "name": "TheAshok"
-  },
-  {
-    "latitude": 28.6358,
-    "longitude": 77.2172,
-    "name": "ShivajiStadium"
-  },
-  {
-    "latitude": 28.6238,
-    "longitude": 77.2464,
-    "name": "BharatMandapam"
-  },
-  {
-    "latitude": 28.6225,
-    "longitude": 77.2435,
-    "name": "PragatiMaidan"
-  },
-  {
-    "latitude": 28.6087,
-    "longitude": 77.2291,
-    "name": "NationalZoologicalPark"
-  },
-  {
-    "latitude": 28.6119,
-    "longitude": 77.2195,
-    "name": "NationalMuseum"
-  },
-  {
-    "latitude": 28.5939,
-    "longitude": 77.2230,
-    "name": "IndiaHabitatCentre"
-  },
-  {
-    "latitude": 28.5933,
-    "longitude": 77.2155,
-    "name": "IndiaInternationalCentre"
-  },
-  {
-    "latitude": 28.6166,
-    "longitude": 77.2366,
-    "name": "MandiHouse"
-  },
-  {
-    "latitude": 28.6277,
-    "longitude": 77.2372,
-    "name": "BarakhambaRoad"
-  },
-  {
-    "latitude": 28.5284,
-    "longitude": 77.2125,
-    "name": "SaketDistrictCentre"
+    "name": "ChattarpurMandir",
+    "no_of_passengers": 1,
+    "luggage": 1,
   }
 ]
