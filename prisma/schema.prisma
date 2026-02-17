@@ -1,0 +1,77 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Users {
+  id          String   @id @default(uuid())
+  name        String
+  email       String   @unique
+  password    String
+  createdAt   DateTime @default(now())
+  gender      String
+  age         Int
+  ride_otp    Int?
+  otp_expiry  DateTime?
+
+  rideRequests RideRequests[]
+}
+
+model Drivers {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  gender    String
+  age       Int
+
+  cab Cabs? @relation("DriverCab")
+}
+
+model Cabs {
+  id               String @id @default(uuid())
+  cab_number       String @unique
+  cab_type         String
+  no_of_seats      Int
+  luggage_capacity Int
+  status           String @default("AVAILABLE")
+
+  driver_id String  @unique
+  driver    Drivers @relation("DriverCab", fields: [driver_id], references: [id])
+
+  trips Trips[]
+}
+
+model Trips {
+  id               String   @id @default(uuid())
+  status           String
+  fare_each        Int
+  no_of_passengers Int      @default(0)
+  total_luggage    Int      @default(0)
+  created_at       DateTime @default(now())
+
+  cab_id String?
+  cab    Cabs?   @relation(fields: [cab_id], references: [id])
+
+  rideRequests RideRequests[]
+}
+
+model RideRequests {
+  id               String   @id @default(uuid())
+  status           String
+  no_of_passengers Int
+  luggage_capacity Int
+  issued_price     Int
+  joined_at        DateTime @default(now())
+
+  user_id String
+  user    Users  @relation(fields: [user_id], references: [id])
+
+  trip_id String
+  trip    Trips  @relation(fields: [trip_id], references: [id])
+}

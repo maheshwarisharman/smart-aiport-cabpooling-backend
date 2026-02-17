@@ -5,6 +5,8 @@ import { dataSet } from './src/utils/sampleDataSet'
 import express from 'express'
 import findRideRouter from './src/routes/findRide'
 import { rideWebSocketHandler, type WsData } from './src/routes/findRide'
+import signupRouter from './src/routes/signup'
+import startRideRouter from './src/routes/startRide'
 
 const app = express()
 app.use(express.json())
@@ -34,6 +36,8 @@ main()
 
 // ── HTTP Server (Express) on port 3000 ──
 app.use('/find-ride', findRideRouter)
+app.use('/signup', signupRouter)
+app.use('/ride', startRideRouter)
 
 app.get('/', async (req, res) => {
 

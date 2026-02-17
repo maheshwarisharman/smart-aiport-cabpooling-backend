@@ -3,11 +3,16 @@ import * as h3 from 'h3-js'; // You need this to convert Split Point H3 to Lat/L
 import { randomUUID } from 'crypto';
 import { pubSubService } from './pubsub';
 
+import { prisma } from '../../lib/prisma'
+
+
 interface RouteMatch {
     match_type: 'DIRECT' | 'BEST_DETOUR' | 'NONE' | 'NEIGHBOUR';
     user_id?: string;
     detour_distance_meters?: number;
     split_point_h3?: string;
+    trip_id?: string;
+    trip?: any;
 }
 
 interface PassengerMetaData {
@@ -24,11 +29,13 @@ interface LatLng {
 }
 
 interface TripMetaData {
-    users: {},
+    trip_id: string,
+    users: Record<string, PassengerMetaData>[],
     no_of_passengers: number,
     luggage: number,
     status: 'WAITING' | 'ACTIVE',
-    issued_price: number
+    issued_price: number,
+    trip?: any
 }
 
 interface GoogleRoutesResponse {
@@ -124,6 +131,7 @@ export class RedisPoolingService {
         try {
 
             const myRouteString = this.getRouteString(routeIndexes);
+            const myMemberValue = `${myRouteString}::${user_id}`;
             const myDestinationH3 = routeIndexes[routeIndexes.length - 1];
 
             // --- STEP 1 Check A: Am I a SUBSET? ---
@@ -135,12 +143,14 @@ export class RedisPoolingService {
             const perfectLongMatch = supersetCandidates.find(c => !c.includes(user_id));
             if (perfectLongMatch) {
                 const matchedUser = perfectLongMatch.split('::')[1];
-                const isTripEligible: boolean | TripMetaData = await this.checkMatchConstraints(matchedUser, userMetaData, user_id, myRouteString, perfectLongMatch)
+                const isTripEligible: boolean | TripMetaData = await this.checkMatchConstraints(matchedUser, userMetaData, user_id, myMemberValue, perfectLongMatch)
 
                 if (typeof isTripEligible !== 'boolean') {
                     return {
                         match_type: 'DIRECT',
-                        user_id: matchedUser
+                        user_id: matchedUser,
+                        trip_id: isTripEligible.trip_id,
+                        trip: isTripEligible.trip
                     }
                 }
                 console.log("STEP 1: Found direct match (Longer route containing us) ->", matchedUser);
@@ -166,12 +176,14 @@ export class RedisPoolingService {
                 if (myRouteString.startsWith(neighborRoute)) {
                     console.log("STEP 1: Found direct match (Shorter route inside us) ->", neighborId);
 
-                    const isTripEligible: boolean | TripMetaData = await this.checkMatchConstraints(neighborId, userMetaData, user_id, myRouteString, neighbor)
+                    const isTripEligible: boolean | TripMetaData = await this.checkMatchConstraints(neighborId, userMetaData, user_id, myMemberValue, neighbor)
 
                     if (typeof isTripEligible !== 'boolean') {
                         return {
                             match_type: 'DIRECT',
-                            user_id: neighborId
+                            user_id: neighborId,
+                            trip_id: isTripEligible.trip_id,
+                            trip: isTripEligible.trip
                         }
                     }
                 }
@@ -228,14 +240,16 @@ export class RedisPoolingService {
                 if (detourMeters < 3000 && detourMeters < minDetourMeters) {
                     minDetourMeters = detourMeters;
 
-                    const isTripEligible: boolean | TripMetaData = await this.checkMatchConstraints(candidateUserId, userMetaData, user_id, myRouteString, candidate)
+                    const isTripEligible: boolean | TripMetaData = await this.checkMatchConstraints(candidateUserId, userMetaData, user_id, myMemberValue, candidate)
 
                     if (typeof isTripEligible !== 'boolean') {
                         return bestMatch = {
                             match_type: 'BEST_DETOUR',
                             user_id: candidateUserId,
                             detour_distance_meters: detourMeters,
-                            split_point_h3: splitPointH3
+                            split_point_h3: splitPointH3,
+                            trip_id: isTripEligible.trip_id,
+                            trip: isTripEligible.trip
                         };
                     }
                 }
@@ -253,9 +267,10 @@ export class RedisPoolingService {
         try {
 
             const matchedUserData: string | {} | null = await this.client.get(matchedUserId)
+            console.log(matchedUserId)
             if (typeof matchedUserData === 'string' && matchedUserData) {
 
-                const data: PassengerMetaData = JSON.parse(matchedUserData)
+                const data: PassengerMetaData | TripMetaData = JSON.parse(matchedUserData)
                 if (data.luggage + requestingUserMetaData.luggage > this.LUGGAGE_CAPACITY || data.no_of_passengers + requestingUserMetaData.no_of_passengers > this.MAX_PASSENGERS) {
                     return false
                 }
@@ -269,27 +284,59 @@ export class RedisPoolingService {
 
                 const tripKey = `TRIP${randomUUID()}`
 
+
                 // Store the combined trip route back in Redis
                 if (!status) {
                     await this.storeTripRoute(requestingUserRouteSignature, matchedUserSignature, tripKey)
                 }
 
+                const isExistingTrip = 'users' in data
+
                 const tripMetaData: TripMetaData = {
-                    users: [data, requestingUserMetaData],
+                    trip_id: tripKey,
+                    users: [{ [matchedUserId]: data as PassengerMetaData }, { [requestingUserId]: requestingUserMetaData }],
                     luggage: data.luggage + requestingUserMetaData.luggage,
                     no_of_passengers: data.no_of_passengers + requestingUserMetaData.no_of_passengers,
                     status: status ? 'ACTIVE' : 'WAITING',
                     issued_price: data.issued_price * 0.3 //TODO: Calculate the new price for the trip here
                 }
 
+                if (isExistingTrip) {
+                    tripMetaData.users = [...(data as TripMetaData).users, { [requestingUserId]: requestingUserMetaData }]
+                }
+
                 // Store the trip metadata in Redis under the same trip key
                 await this.storeTripMetaData(tripKey, tripMetaData)
+
+                // ── Persist to Database ──
+                const dbTripId = await this.persistMatchToDatabase(
+                    tripMetaData,
+                    requestingUserId,
+                    requestingUserMetaData,
+                    matchedUserId,
+                    isExistingTrip ? (data as TripMetaData) : (data as PassengerMetaData),
+                    isExistingTrip
+                )
+
+                // ── Query the full trip from DB with all related data ──
+                let fullTrip = null
+                if (dbTripId) {
+                    fullTrip = await prisma.trips.findUnique({
+                        where: { id: dbTripId },
+                        include: {
+                            cab: { include: { driver: true } },
+                            rideRequests: { include: { user: true } }
+                        }
+                    })
+                }
+
+                // Attach full trip to metadata for the requesting user
+                tripMetaData.trip = fullTrip
 
                 // Notify the matched user via Redis PubSub (WebSocket will receive this)
                 await pubSubService.publish(matchedUserId, {
                     type: 'RIDE_MATCHED',
-                    tripKey,
-                    tripMetaData
+                    trip: fullTrip
                 }).catch((err) => console.error('PubSub publish error:', err));
 
                 return tripMetaData
@@ -299,6 +346,233 @@ export class RedisPoolingService {
         } catch (e) {
             console.log(e)
             return false
+        }
+    }
+
+    /**
+     * Persists a successful ride match to the database.
+     *
+     * Case 1 — Two individual users matched:
+     *   → Creates a new Trip and two RideRequests.
+     *
+     * Case 2 — A new user joins an existing Trip:
+     *   → Finds (or creates) the Trip row, creates a RideRequest for the new user.
+     *
+     * Co-riders are derived from Trip → RideRequests (no separate RideShare table).
+     * All writes are wrapped in a Prisma interactive transaction for atomicity.
+     * DB failures are logged but do NOT block the Redis / PubSub flow.
+     */
+    private async persistMatchToDatabase(
+        tripMetaData: TripMetaData,
+        requestingUserId: string,
+        requestingUserMetaData: PassengerMetaData,
+        matchedUserId: string,
+        matchedData: PassengerMetaData | TripMetaData,
+        isExistingTrip: boolean
+    ): Promise<string | null> {
+        try {
+            const dbTripId = await prisma.$transaction(async (tx) => {
+
+                // ── Validate that the requesting user exists ──
+                const requestingUser = await tx.users.findUnique({ where: { id: requestingUserId } })
+                if (!requestingUser) {
+                    console.error(`[DB Persist] Requesting user not found: ${requestingUserId}`)
+                    return null
+                }
+
+                // ── Try to find an available cab (optional — trip can exist without one) ──
+                const availableCab = await tx.cabs.findFirst({
+                    where: {
+                        status: 'AVAILABLE',
+                        no_of_seats: { gte: tripMetaData.no_of_passengers },
+                        luggage_capacity: { gte: tripMetaData.luggage }
+                    },
+                    orderBy: { no_of_seats: 'asc' } // Prefer smallest sufficient cab
+                })
+
+                if (!availableCab) {
+                    console.warn('[DB Persist] No available cab with sufficient capacity. Trip will be created without a cab assignment.')
+                }
+
+                // Compute per-rider fare
+                const totalUsers = tripMetaData.users.length
+                const fareEach = Math.ceil(tripMetaData.issued_price / totalUsers)
+
+                if (isExistingTrip) {
+                    // ─────────────────────────────────────────────────────
+                    // CASE 2: New user joins an existing Trip
+                    // ─────────────────────────────────────────────────────
+                    const existingTripData = matchedData as TripMetaData
+
+                    // Find the existing Trip row by its Redis trip_id
+                    let existingTrip = await tx.trips.findFirst({
+                        where: { id: existingTripData.trip_id },
+                        include: { rideRequests: true }
+                    })
+
+                    // Edge case: Trip might not exist in DB yet (e.g., was created without cab earlier)
+                    if (!existingTrip) {
+                        console.warn(`[DB Persist] Existing trip ${existingTripData.trip_id} not found in DB. Creating fresh trip.`)
+
+                        existingTrip = await tx.trips.create({
+                            data: {
+                                status: tripMetaData.status,
+                                fare_each: fareEach,
+                                no_of_passengers: tripMetaData.no_of_passengers,
+                                total_luggage: tripMetaData.luggage,
+                                cab_id: availableCab?.id ?? null
+                            },
+                            include: { rideRequests: true }
+                        })
+
+                        // Create RideRequests for all pre-existing users in the trip
+                        for (const userEntry of existingTripData.users) {
+                            const [existingUserId, existingMeta] = Object.entries(userEntry)[0]
+
+                            const userExists = await tx.users.findUnique({ where: { id: existingUserId } })
+                            if (!userExists) {
+                                console.warn(`[DB Persist] Skipping non-existent user: ${existingUserId}`)
+                                continue
+                            }
+
+                            await tx.rideRequests.create({
+                                data: {
+                                    status: tripMetaData.status,
+                                    no_of_passengers: existingMeta.no_of_passengers,
+                                    luggage_capacity: existingMeta.luggage,
+                                    issued_price: fareEach,
+                                    user_id: existingUserId,
+                                    trip_id: existingTrip.id
+                                }
+                            })
+                        }
+
+                        // Refetch to get all ride requests
+                        existingTrip = await tx.trips.findUniqueOrThrow({
+                            where: { id: existingTrip.id },
+                            include: { rideRequests: true }
+                        })
+                    }
+
+                    // Check for duplicate ride request
+                    const duplicateRequest = existingTrip.rideRequests.find(
+                        (rr) => rr.user_id === requestingUserId
+                    )
+                    if (duplicateRequest) {
+                        console.warn(`[DB Persist] Duplicate ride request for user ${requestingUserId} on trip ${existingTrip.id}. Skipping.`)
+                        return existingTrip.id
+                    }
+
+                    // Create RideRequest for the new joining user
+                    await tx.rideRequests.create({
+                        data: {
+                            status: tripMetaData.status,
+                            no_of_passengers: requestingUserMetaData.no_of_passengers,
+                            luggage_capacity: requestingUserMetaData.luggage,
+                            issued_price: fareEach,
+                            user_id: requestingUserId,
+                            trip_id: existingTrip.id
+                        }
+                    })
+
+                    // Update trip status, fare, and ensure all existing RideRequests have consistent status
+                    await tx.trips.update({
+                        where: { id: existingTrip.id },
+                        data: {
+                            status: tripMetaData.status,
+                            fare_each: fareEach,
+                            no_of_passengers: tripMetaData.no_of_passengers,
+                            total_luggage: tripMetaData.luggage,
+                            cab_id: availableCab?.id ?? existingTrip.cab_id // Assign cab if available and not already assigned
+                        }
+                    })
+
+                    // Sync status on all existing RideRequests to match the Trip
+                    await tx.rideRequests.updateMany({
+                        where: { trip_id: existingTrip.id },
+                        data: {
+                            status: tripMetaData.status,
+                            issued_price: fareEach
+                        }
+                    })
+
+                    // Update cab status if trip is now ACTIVE (full capacity)
+                    if (tripMetaData.status === 'ACTIVE' && availableCab) {
+                        await tx.cabs.update({
+                            where: { id: availableCab.id },
+                            data: { status: 'BOOKED' }
+                        })
+                    }
+
+                    console.log(`[DB Persist] User ${requestingUserId} joined existing trip ${existingTrip.id}`)
+                    return existingTrip.id
+
+                } else {
+                    // ─────────────────────────────────────────────────────
+                    // CASE 1: Two individual users matched — fresh Trip
+                    // ─────────────────────────────────────────────────────
+                    const matchedPassengerData = matchedData as PassengerMetaData
+
+                    // Validate the matched user exists
+                    const matchedUser = await tx.users.findUnique({ where: { id: matchedUserId } })
+                    if (!matchedUser) {
+                        console.error(`[DB Persist] Matched user not found: ${matchedUserId}`)
+                        return null
+                    }
+
+                    // Create the Trip (cab_id is optional)
+                    const trip = await tx.trips.create({
+                        data: {
+                            status: tripMetaData.status,
+                            fare_each: fareEach,
+                            no_of_passengers: tripMetaData.no_of_passengers,
+                            total_luggage: tripMetaData.luggage,
+                            cab_id: availableCab?.id ?? null
+                        }
+                    })
+
+                    // Create RideRequests for both users
+                    await Promise.all([
+                        tx.rideRequests.create({
+                            data: {
+                                status: tripMetaData.status,
+                                no_of_passengers: matchedPassengerData.no_of_passengers,
+                                luggage_capacity: matchedPassengerData.luggage,
+                                issued_price: fareEach,
+                                user_id: matchedUserId,
+                                trip_id: trip.id
+                            }
+                        }),
+                        tx.rideRequests.create({
+                            data: {
+                                status: tripMetaData.status,
+                                no_of_passengers: requestingUserMetaData.no_of_passengers,
+                                luggage_capacity: requestingUserMetaData.luggage,
+                                issued_price: fareEach,
+                                user_id: requestingUserId,
+                                trip_id: trip.id
+                            }
+                        })
+                    ])
+
+                    // Update cab status if trip is ACTIVE (full capacity)
+                    if (tripMetaData.status === 'ACTIVE' && availableCab) {
+                        await tx.cabs.update({
+                            where: { id: availableCab.id },
+                            data: { status: 'BOOKED' }
+                        })
+                    }
+
+                    console.log(`[DB Persist] Created new trip ${trip.id} for users ${matchedUserId} & ${requestingUserId}`)
+                    return trip.id
+                }
+            })
+            return dbTripId ?? null
+        } catch (error) {
+            // DB failure should NOT break the Redis matching flow.
+            // The trip exists in Redis and can be retried / reconciled later.
+            console.error('[DB Persist] Failed to persist match to database:', error)
+            return null
         }
     }
 
@@ -326,6 +600,38 @@ export class RedisPoolingService {
             console.log(`Stored trip metadata under key: ${tripKey}`)
         } catch (e) {
             console.log('Error storing trip metadata:', e)
+        }
+    }
+
+    /**
+     * Removes a user's entries from the Redis pool entirely:
+     * 1. Scans the sorted set for any member whose `::userId` suffix matches.
+     * 2. Removes the matching member(s) from the sorted set via ZREM.
+     * 3. Deletes the user's metadata key.
+     *
+     * Safe to call even if the user has no entries (no-op in that case).
+     */
+    async removeUserFromPool(userId: string): Promise<void> {
+        try {
+            // Scan the entire sorted set for members containing this userId
+            // Members are stored as `<routeString>::<userId>`
+            const allMembers = await this.client.zRange(this.POOL_KEY, 0, -1)
+
+            const userMembers = allMembers.filter(member => {
+                const suffix = member.split('::')[1]
+                return suffix === userId
+            })
+
+            if (userMembers.length > 0) {
+                await this.client.zRem(this.POOL_KEY, userMembers)
+                console.log(`[Cleanup] Removed ${userMembers.length} sorted-set entry(ies) for user: ${userId}`)
+            }
+
+            // Delete the user's metadata key
+            await this.client.del(userId)
+            console.log(`[Cleanup] Deleted metadata key for user: ${userId}`)
+        } catch (e) {
+            console.error(`[Cleanup] Error removing user ${userId} from pool:`, e)
         }
     }
 }
