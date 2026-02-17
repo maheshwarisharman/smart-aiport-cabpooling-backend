@@ -8,15 +8,15 @@ datasource db {
 }
 
 model Users {
-  id          String   @id @default(uuid())
-  name        String
-  email       String   @unique
-  password    String
-  createdAt   DateTime @default(now())
-  gender      String
-  age         Int
-  ride_otp    Int?
-  otp_expiry  DateTime?
+  id         String    @id @default(uuid())
+  name       String
+  email      String    @unique
+  password   String
+  createdAt  DateTime  @default(now())
+  gender     String
+  age        Int
+  ride_otp   Int?
+  otp_expiry DateTime?
 
   rideRequests RideRequests[]
 }

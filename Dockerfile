@@ -25,7 +25,7 @@ RUN bunx prisma generate
 
 
 # ── Stage 2: Production image ───────────────────────────────
-FROM oven/bun:1-slim AS runtime
+FROM oven/bun:1 AS runtime
 
 WORKDIR /app
 
@@ -53,10 +53,11 @@ EXPOSE 3000 3001
 #   2. Running the seed script (idempotent — safe to re-run)
 #   3. Starting the Bun server
 CMD ["sh", "-c", "\
+  if [ -z \"$DATABASE_URL\" ]; then echo '❌ DATABASE_URL is missing!'; exit 1; fi && \
   echo '⏳ Waiting for PostgreSQL to accept connections...' && \
   retries=0 && \
   max_retries=30 && \
-  until bunx prisma migrate deploy 2>/dev/null; do \
+  until bunx prisma migrate deploy; do \
     retries=$((retries + 1)); \
     if [ $retries -ge $max_retries ]; then \
       echo '❌ Could not connect to PostgreSQL after ${max_retries} attempts. Exiting.'; \
