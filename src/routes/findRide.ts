@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { generateH3IndexesForRoute, calculateIssuedPrice } from '../rideMatching/demo';
-import { redisService } from '../utils/redisClient';
 import { pubSubService } from '../utils/pubsub';
 import { prisma } from '../../lib/prisma';
+import { rideMatchingPool } from '../../index';
 import type { ServerWebSocket } from 'bun';
 
 const router = Router();
@@ -129,7 +129,7 @@ export const rideWebSocketHandler = {
                 }
 
                 try {
-                    // Generate H3 indexes for the route
+                    // Generate H3 indexes for the route (lightweight, stays on main thread)
                     const result = await generateH3IndexesForRoute({
                         latitude: payload.latitude,
                         longitude: payload.longitude
@@ -143,18 +143,24 @@ export const rideWebSocketHandler = {
                         issued_price: calculateIssuedPrice(result.totalDistanceKm)
                     };
 
-                    // Store metadata in Redis
-                    await redisService.storePassengerMetaData(userId, userMetaData);
-
-                    // Store route index in Redis sorted set
-                    await redisService.storeRouteH3Index(userId, result.pathH3Indexes);
-
-                    // Attempt matching immediately
-                    const matches = await redisService.matchUserWithAvaialbleTrip(
-                        userId,
-                        result.pathH3Indexes,
-                        userMetaData
-                    );
+                    // ── Offload to worker thread ──
+                    // The heavy ride matching (Redis storage + H3 comparisons +
+                    // Google Routes API + Prisma persistence) runs on a separate thread
+                    const matches = await rideMatchingPool.execute<{
+                        match_type: 'DIRECT' | 'BEST_DETOUR' | 'NONE' | 'NEIGHBOUR';
+                        user_id?: string;
+                        detour_distance_meters?: number;
+                        split_point_h3?: string;
+                        trip_id?: string;
+                        trip?: any;
+                    }>({
+                        type: 'MATCH_RIDE',
+                        payload: {
+                            userId,
+                            routeIndexes: result.pathH3Indexes,
+                            userMetaData
+                        }
+                    });
 
                     if (matches.match_type !== 'NONE') {
                         // Match found! Notify via WebSocket
@@ -187,9 +193,13 @@ export const rideWebSocketHandler = {
     async close(ws: ServerWebSocket<WsData>, code: number, reason: string) {
         const { userId } = ws.data;
         if (userId) {
-            // ── Remove user from Redis pool on disconnect ──
+            // ── Offload cleanup to worker thread ──
             // This ensures no one can match with a disconnected user
-            await redisService.removeUserFromPool(userId);
+            rideMatchingPool.execute({
+                type: 'REMOVE_USER',
+                payload: { userId }
+            }).catch(err => console.error(`[WS Close] Failed to remove user ${userId}:`, err));
+
             await pubSubService.unsubscribe(userId);
             console.log(`WebSocket closed for user: ${userId} (code: ${code}) — removed from Redis pool`);
         }

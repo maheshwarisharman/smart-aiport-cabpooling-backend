@@ -1,36 +1,31 @@
-import { redisService } from './src/utils/redisClient'
 import { pubSubService } from './src/utils/pubsub'
-import { generateH3IndexesForRoute } from './src/rideMatching/demo'
-import { dataSet } from './src/utils/sampleDataSet'
+import { WorkerPool } from './src/workers/workerPool'
 import express from 'express'
 import findRideRouter from './src/routes/findRide'
 import { rideWebSocketHandler, type WsData } from './src/routes/findRide'
 import signupRouter from './src/routes/signup'
 import startRideRouter from './src/routes/startRide'
+import cancelRideRouter from './src/routes/cancelRide'
 
 const app = express()
 app.use(express.json())
 
+// ── Worker Pool (globally accessible) ──
+const workerPath = new URL('./src/workers/rideMatchingWorker.ts', import.meta.url).href
+export const rideMatchingPool = new WorkerPool(workerPath)
+
 async function main() {
-    await redisService.connect()
+    // 1. Connect PubSub on the main thread
+    //    (used for WebSocket subscription management)
     await pubSubService.connect()
 
-    // for(const item of dataSet) {
-    //     const result = await generateH3IndexesForRoute(item)
-    //     const res1 = await redisService.storeDestinationH3Index(item.name, result.destinationH3)
-    //     const isMetaDataStored = await redisService.storePassengerMetaData(item.name, {
-    //         no_of_passengers: item.no_of_passengers,
-    //         destination_h3: result.destinationH3,
-    //         luggage: item.luggage,
-    //         status: 'WAITING',
-    //         issued_price: 500//Calculate the price here
-    //     })
+    // 2. Initialize the worker pool
+    //    Each worker gets its own Redis connection in its thread
+    await rideMatchingPool.init()
 
-    //     const res2 = await redisService.storeRouteH3Index(item.name, result.pathH3Indexes)
-    // if(res2) {
-    //     console.log("Route Indexes stored successfully");
-    // }
-    // }
+    console.log(`\n🚀 Server started with ${rideMatchingPool.size} worker threads for ride matching`)
+    console.log(`   CPU-intensive ride matching is offloaded to worker threads`)
+    console.log(`   Main thread handles HTTP, WebSocket, and PubSub only\n`)
 }
 main()
 
@@ -38,9 +33,14 @@ main()
 app.use('/find-ride', findRideRouter)
 app.use('/signup', signupRouter)
 app.use('/ride', startRideRouter)
+app.use('/cancel-ride', cancelRideRouter)
 
 app.get('/', async (req, res) => {
-
+    res.json({
+        status: 'ok',
+        workers: rideMatchingPool.size,
+        pendingTasks: rideMatchingPool.pendingCount
+    })
 })
 
 app.listen(3000, () => {
@@ -82,8 +82,8 @@ console.log(`WebSocket server running on ws://localhost:${wsServer.port}/ws`)
 // ── Graceful Shutdown ──
 const shutdown = async () => {
     console.log('\nShutting down gracefully...')
+    await rideMatchingPool.terminate()
     await pubSubService.disconnect()
-    await redisService.disconnect()
     wsServer.stop()
     process.exit(0)
 }

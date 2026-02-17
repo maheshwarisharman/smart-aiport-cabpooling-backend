@@ -672,4 +672,79 @@ export class RedisPoolingService {
             console.error(`[Cleanup] Error removing user ${userId} from pool:`, e)
         }
     }
+
+    /**
+     * Removes a user from their trip's metadata stored in Redis.
+     *
+     * 1. Scans the sorted set for TRIP members.
+     * 2. For each trip key, reads TripMetaData and checks if the user is
+     *    in the `users` array.
+     * 3. If found, removes the user entry, decrements totals, recalculates
+     *    the aggregate issued price, and writes the updated metadata back.
+     * 4. Calls `removeUserFromPool(userId)` for full route/metadata cleanup.
+     *
+     * Safe to call even if the user has no trip entries (no-op).
+     */
+    async removeUserFromTripMetadata(userId: string): Promise<void> {
+        try {
+            // First, clean up the user's individual pool entries
+            await this.removeUserFromPool(userId)
+
+            // Scan sorted set for TRIP members
+            const allMembers = await this.client.zRange(this.POOL_KEY, 0, -1)
+            const tripMembers = allMembers.filter(member => {
+                const suffix = member.split('::')[1]
+                return suffix?.startsWith('TRIP')
+            })
+
+            for (const tripMember of tripMembers) {
+                const tripKey = tripMember.split('::')[1]
+                if (!tripKey) continue
+
+                const tripDataRaw = await this.client.get(tripKey)
+                if (!tripDataRaw || typeof tripDataRaw !== 'string') continue
+
+                const tripData: TripMetaData = JSON.parse(tripDataRaw)
+
+                // Check if this user is part of this trip
+                const userIndex = tripData.users.findIndex(
+                    userEntry => userId in userEntry
+                )
+
+                if (userIndex === -1) continue
+
+                // Found the user's trip — extract their metadata before removal
+                const userMeta = tripData.users[userIndex][userId] as PassengerMetaData
+
+                // Remove the user from the trip's users array
+                tripData.users.splice(userIndex, 1)
+
+                // Recalculate trip aggregates
+                tripData.no_of_passengers = Math.max(0, tripData.no_of_passengers - userMeta.no_of_passengers)
+                tripData.luggage = Math.max(0, tripData.luggage - userMeta.luggage)
+
+                // Recalculate total issued price from remaining users
+                tripData.issued_price = tripData.users.reduce((sum, entry) => {
+                    const [, meta] = Object.entries(entry)[0]
+                    return sum + (meta as PassengerMetaData).issued_price
+                }, 0)
+
+                // If no users remain, clean up the trip from Redis entirely
+                if (tripData.users.length === 0) {
+                    await this.client.del(tripKey)
+                    await this.client.zRem(this.POOL_KEY, [tripMember])
+                    console.log(`[Cleanup] Removed empty trip ${tripKey} from Redis`)
+                } else {
+                    // Write updated trip metadata back to Redis
+                    await this.client.set(tripKey, JSON.stringify(tripData))
+                    console.log(`[Cleanup] Updated trip ${tripKey} — removed user ${userId}`)
+                }
+
+                // A user can only be in one trip, so we can stop scanning
+                break
+            }
+        } catch (e) {
+            console.error(`[Cleanup] Error removing user ${userId} from trip metadata:`, e)
+        }
+    }
 }
