@@ -195,9 +195,9 @@ erDiagram
 
 The matching logic is implemented in `src/utils/redisCaching.ts` and runs on worker threads to prevent blocking the main event loop. It uses **H3 (Hexagonal Hierarchical Spatial Index)** to treat routes as strings of characters, enabling efficient prefix-based matching in Redis.
 
-![High Level Architecture](./docs/1.png)
 ![High Level Architecture](./docs/2.png)
 ![High Level Architecture](./docs/3.png)
+![High Level Architecture](./docs/1.png)
 
 
 ### Core Concept: Route Linearization
