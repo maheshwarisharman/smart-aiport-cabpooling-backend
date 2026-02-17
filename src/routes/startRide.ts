@@ -100,7 +100,6 @@ router.post('/generate-otp', async (req, res) => {
             message: 'OTPs generated successfully',
             trip_id,
             otp_expiry: otpExpiry.toISOString(),
-            users: otpSummary,
         });
     } catch (error) {
         console.error('Error generating OTPs:', error);
@@ -286,6 +285,53 @@ router.post('/start', async (req, res) => {
         });
     } catch (error) {
         console.error('Error starting ride:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// ──────────────────────────────────────────────────────────────
+// POST /get-otp
+// Body: { user_id: string }
+//
+// Returns the current OTP for the given user, if one has been
+// generated and has not yet expired.
+// ──────────────────────────────────────────────────────────────
+router.post('/get-otp', async (req, res) => {
+    try {
+        const { user_id } = req.body;
+
+        // ── Validate input ──
+        if (!user_id || typeof user_id !== 'string') {
+            res.status(400).json({ error: 'user_id is required and must be a string' });
+            return;
+        }
+
+        // ── Fetch user ──
+        const user = await prisma.users.findUnique({
+            where: { id: user_id },
+            select: { id: true, ride_otp: true, otp_expiry: true },
+        });
+
+        if (!user) {
+            res.status(404).json({ error: 'User not found' });
+            return;
+        }
+
+        // ── Check if OTP exists ──
+        if (user.ride_otp == null) {
+            res.status(404).json({ error: 'No OTP has been generated for this user' });
+            return;
+        }
+
+        // ── Check if OTP has expired ──
+        if (user.otp_expiry && user.otp_expiry < new Date()) {
+            res.status(410).json({ error: 'OTP has expired. Please request a new one.' });
+            return;
+        }
+
+        res.status(200).json({ otp: user.ride_otp });
+    } catch (error) {
+        console.error('Error fetching OTP:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });

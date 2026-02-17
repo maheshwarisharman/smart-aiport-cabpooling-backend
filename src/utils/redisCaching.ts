@@ -292,17 +292,47 @@ export class RedisPoolingService {
 
                 const isExistingTrip = 'users' in data
 
-                const tripMetaData: TripMetaData = {
-                    trip_id: tripKey,
-                    users: [{ [matchedUserId]: data as PassengerMetaData }, { [requestingUserId]: requestingUserMetaData }],
-                    luggage: data.luggage + requestingUserMetaData.luggage,
-                    no_of_passengers: data.no_of_passengers + requestingUserMetaData.no_of_passengers,
-                    status: status ? 'ACTIVE' : 'WAITING',
-                    issued_price: data.issued_price * 0.3 //TODO: Calculate the new price for the trip here
+                // ── Apply 70% discount to each user's individual price ──
+                const MATCH_DISCOUNT = 0.7
+
+                // Discount the requesting user's price
+                const discountedRequestingPrice = Math.ceil(requestingUserMetaData.issued_price * MATCH_DISCOUNT)
+                const discountedRequestingMeta: PassengerMetaData = {
+                    ...requestingUserMetaData,
+                    issued_price: discountedRequestingPrice
                 }
 
+                let tripMetaData: TripMetaData
+
                 if (isExistingTrip) {
-                    tripMetaData.users = [...(data as TripMetaData).users, { [requestingUserId]: requestingUserMetaData }]
+                    // ── Case: New user joins an existing trip ──
+                    // Only the new user gets the 70% discount; existing users' prices are already set
+                    const existingTrip = data as TripMetaData
+                    tripMetaData = {
+                        trip_id: tripKey,
+                        users: [...existingTrip.users, { [requestingUserId]: discountedRequestingMeta }],
+                        luggage: data.luggage + requestingUserMetaData.luggage,
+                        no_of_passengers: data.no_of_passengers + requestingUserMetaData.no_of_passengers,
+                        status: 'WAITING',
+                        issued_price: existingTrip.issued_price + discountedRequestingPrice
+                    }
+                } else {
+                    // ── Case: Two individual users matched — both get discount ──
+                    const matchedPassengerData = data as PassengerMetaData
+                    const discountedMatchedPrice = Math.ceil(matchedPassengerData.issued_price * MATCH_DISCOUNT)
+                    const discountedMatchedMeta: PassengerMetaData = {
+                        ...matchedPassengerData,
+                        issued_price: discountedMatchedPrice
+                    }
+
+                    tripMetaData = {
+                        trip_id: tripKey,
+                        users: [{ [matchedUserId]: discountedMatchedMeta }, { [requestingUserId]: discountedRequestingMeta }],
+                        luggage: data.luggage + requestingUserMetaData.luggage,
+                        no_of_passengers: data.no_of_passengers + requestingUserMetaData.no_of_passengers,
+                        status: 'WAITING',
+                        issued_price: discountedMatchedPrice + discountedRequestingPrice
+                    }
                 }
 
                 // Store the trip metadata in Redis under the same trip key
@@ -325,7 +355,13 @@ export class RedisPoolingService {
                         where: { id: dbTripId },
                         include: {
                             cab: { include: { driver: true } },
-                            rideRequests: { include: { user: true } }
+                            rideRequests: {
+                                include: {
+                                    user: {
+                                        select: { name: true, age: true, gender: true }
+                                    }
+                                }
+                            }
                         }
                     })
                 }
@@ -394,9 +430,8 @@ export class RedisPoolingService {
                     console.warn('[DB Persist] No available cab with sufficient capacity. Trip will be created without a cab assignment.')
                 }
 
-                // Compute per-rider fare
-                const totalUsers = tripMetaData.users.length
-                const fareEach = Math.ceil(tripMetaData.issued_price / totalUsers)
+                // Per-user prices are already calculated with the 70% discount
+                // Each user's RideRequest will have their own individual price
 
                 if (isExistingTrip) {
                     // ─────────────────────────────────────────────────────
@@ -417,7 +452,7 @@ export class RedisPoolingService {
                         existingTrip = await tx.trips.create({
                             data: {
                                 status: tripMetaData.status,
-                                fare_each: fareEach,
+                                fare_each: 0,
                                 no_of_passengers: tripMetaData.no_of_passengers,
                                 total_luggage: tripMetaData.luggage,
                                 cab_id: availableCab?.id ?? null
@@ -438,9 +473,9 @@ export class RedisPoolingService {
                             await tx.rideRequests.create({
                                 data: {
                                     status: tripMetaData.status,
-                                    no_of_passengers: existingMeta.no_of_passengers,
-                                    luggage_capacity: existingMeta.luggage,
-                                    issued_price: fareEach,
+                                    no_of_passengers: (existingMeta as PassengerMetaData).no_of_passengers,
+                                    luggage_capacity: (existingMeta as PassengerMetaData).luggage,
+                                    issued_price: (existingMeta as PassengerMetaData).issued_price,
                                     user_id: existingUserId,
                                     trip_id: existingTrip.id
                                 }
@@ -463,24 +498,30 @@ export class RedisPoolingService {
                         return existingTrip.id
                     }
 
+                    // Get the requesting user's discounted price from tripMetaData
+                    const requestingUserEntry = tripMetaData.users.find(u => requestingUserId in u)
+                    const requestingDiscountedPrice = requestingUserEntry
+                        ? (requestingUserEntry[requestingUserId] as PassengerMetaData).issued_price
+                        : Math.ceil(requestingUserMetaData.issued_price * 0.7)
+
                     // Create RideRequest for the new joining user
                     await tx.rideRequests.create({
                         data: {
                             status: tripMetaData.status,
                             no_of_passengers: requestingUserMetaData.no_of_passengers,
                             luggage_capacity: requestingUserMetaData.luggage,
-                            issued_price: fareEach,
+                            issued_price: requestingDiscountedPrice,
                             user_id: requestingUserId,
                             trip_id: existingTrip.id
                         }
                     })
 
-                    // Update trip status, fare, and ensure all existing RideRequests have consistent status
+                    // Update trip status (per-user prices are already set individually)
                     await tx.trips.update({
                         where: { id: existingTrip.id },
                         data: {
                             status: tripMetaData.status,
-                            fare_each: fareEach,
+                            fare_each: 0, // Per-user pricing — individual prices on RideRequests
                             no_of_passengers: tripMetaData.no_of_passengers,
                             total_luggage: tripMetaData.luggage,
                             cab_id: availableCab?.id ?? existingTrip.cab_id // Assign cab if available and not already assigned
@@ -488,21 +529,14 @@ export class RedisPoolingService {
                     })
 
                     // Sync status on all existing RideRequests to match the Trip
+                    // Note: issued_price is NOT updated here — existing users keep their individual prices
                     await tx.rideRequests.updateMany({
                         where: { trip_id: existingTrip.id },
                         data: {
-                            status: tripMetaData.status,
-                            issued_price: fareEach
+                            status: tripMetaData.status
                         }
                     })
 
-                    // Update cab status if trip is now ACTIVE (full capacity)
-                    if (tripMetaData.status === 'ACTIVE' && availableCab) {
-                        await tx.cabs.update({
-                            where: { id: availableCab.id },
-                            data: { status: 'BOOKED' }
-                        })
-                    }
 
                     console.log(`[DB Persist] User ${requestingUserId} joined existing trip ${existingTrip.id}`)
                     return existingTrip.id
@@ -524,21 +558,32 @@ export class RedisPoolingService {
                     const trip = await tx.trips.create({
                         data: {
                             status: tripMetaData.status,
-                            fare_each: fareEach,
+                            fare_each: 0, // Per-user pricing — individual prices on RideRequests
                             no_of_passengers: tripMetaData.no_of_passengers,
                             total_luggage: tripMetaData.luggage,
                             cab_id: availableCab?.id ?? null
                         }
                     })
 
-                    // Create RideRequests for both users
+                    // Get each user's discounted price from tripMetaData
+                    const matchedUserEntry = tripMetaData.users.find(u => matchedUserId in u)
+                    const matchedDiscountedPrice = matchedUserEntry
+                        ? (matchedUserEntry[matchedUserId] as PassengerMetaData).issued_price
+                        : Math.ceil((matchedData as PassengerMetaData).issued_price * 0.7)
+
+                    const requestingUserEntry = tripMetaData.users.find(u => requestingUserId in u)
+                    const requestingDiscountedPrice = requestingUserEntry
+                        ? (requestingUserEntry[requestingUserId] as PassengerMetaData).issued_price
+                        : Math.ceil(requestingUserMetaData.issued_price * 0.7)
+
+                    // Create RideRequests for both users with their individual discounted prices
                     await Promise.all([
                         tx.rideRequests.create({
                             data: {
                                 status: tripMetaData.status,
-                                no_of_passengers: matchedPassengerData.no_of_passengers,
-                                luggage_capacity: matchedPassengerData.luggage,
-                                issued_price: fareEach,
+                                no_of_passengers: (matchedData as PassengerMetaData).no_of_passengers,
+                                luggage_capacity: (matchedData as PassengerMetaData).luggage,
+                                issued_price: matchedDiscountedPrice,
                                 user_id: matchedUserId,
                                 trip_id: trip.id
                             }
@@ -548,20 +593,13 @@ export class RedisPoolingService {
                                 status: tripMetaData.status,
                                 no_of_passengers: requestingUserMetaData.no_of_passengers,
                                 luggage_capacity: requestingUserMetaData.luggage,
-                                issued_price: fareEach,
+                                issued_price: requestingDiscountedPrice,
                                 user_id: requestingUserId,
                                 trip_id: trip.id
                             }
                         })
                     ])
 
-                    // Update cab status if trip is ACTIVE (full capacity)
-                    if (tripMetaData.status === 'ACTIVE' && availableCab) {
-                        await tx.cabs.update({
-                            where: { id: availableCab.id },
-                            data: { status: 'BOOKED' }
-                        })
-                    }
 
                     console.log(`[DB Persist] Created new trip ${trip.id} for users ${matchedUserId} & ${requestingUserId}`)
                     return trip.id

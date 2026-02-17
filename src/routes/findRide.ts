@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { generateH3IndexesForRoute } from '../rideMatching/demo';
+import { generateH3IndexesForRoute, calculateIssuedPrice } from '../rideMatching/demo';
 import { redisService } from '../utils/redisClient';
 import { pubSubService } from '../utils/pubsub';
 import { prisma } from '../../lib/prisma';
@@ -29,7 +29,9 @@ router.post('/trips', async (req, res) => {
                         },
                         rideRequests: {
                             include: {
-                                user: true
+                                user: {
+                                    select: { name: true, age: true, gender: true }
+                                }
                             }
                         }
                     }
@@ -138,7 +140,7 @@ export const rideWebSocketHandler = {
                         destination_h3: result.destinationH3,
                         luggage: payload.luggage,
                         status: 'WAITING' as const,
-                        issued_price: 500 // TODO: Calculate the price here
+                        issued_price: calculateIssuedPrice(result.totalDistanceKm)
                     };
 
                     // Store metadata in Redis
@@ -208,45 +210,5 @@ interface FindRideRequest {
     longitude: number,
 }
 
-// router.post('/', async (req, res) => {
-//     try {
-//         const body = req.body as FindRideRequest;
-//         const result = await generateH3IndexesForRoute(body)
-
-//         // Store metadata
-//         await redisService.storePassengerMetaData(body.user_id, {
-//             no_of_passengers: body.no_of_passengers,
-//             destination_h3: result.destinationH3,
-//             luggage: body.luggage,
-//             status: 'WAITING',
-//             issued_price: 500 //TODO:Calculate the price here
-//         })
-
-//         // Store route index
-//         await redisService.storeRouteH3Index(body.user_id, result.pathH3Indexes)
-
-//         const matches = await redisService.matchUserWithAvaialbleTrip(body.user_id, result.pathH3Indexes, {
-//             no_of_passengers: body.no_of_passengers,
-//             destination_h3: result.destinationH3,
-//             luggage: body.luggage,
-//             status: 'WAITING',
-//             issued_price: 500 //Calculate the price here
-//         })
-
-//         // ── If no match found, clean up Redis immediately ──
-//         // The user's data should NOT linger in Redis from the HTTP request.
-//         // If the user is interested, they will connect via WebSocket and
-//         // re-register, which puts them back in the pool.
-//         if (matches.match_type === 'NONE') {
-//             await redisService.removeUserFromPool(body.user_id);
-//             console.log(`[find-ride] No match for ${body.user_id} — cleaned up Redis entries`);
-//         }
-
-//         res.json(matches)
-//     } catch (error) {
-//         console.error("Error in find-ride:", error);
-//         res.status(500).json({ error: "Internal Server Error" });
-//     }
-// })
 
 export default router;
