@@ -51,7 +51,7 @@ services:
       - "3001:3001"   # Bun WebSocket
     environment:
       DATABASE_URL: postgresql://admin:admin@postgres:5432/mydb
-      GOOGLE_ROUTES_API_KEY: ${GOOGLE_ROUTES_API_KEY:-AIzaSyCpXKGAn1DTpfVdA2H19r0fiVcOsYvqLPY}
+      GOOGLE_ROUTES_API_KEY: ${GOOGLE_ROUTES_API_KEY:-}
       REDIS_URL: redis://redis:6379
     depends_on:
       postgres:
