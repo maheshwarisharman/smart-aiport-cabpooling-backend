@@ -8,8 +8,6 @@ A real-time airport cab-pooling backend that matches passengers heading in simil
 
 ## Architecture at a Glance
 
-![High Level Architecture](./docs/architecture_flow.png)
-
 | Layer | Tech | Port |
 |---|---|---|
 | HTTP API | Express 5 | `3000` |
