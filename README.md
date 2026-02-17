@@ -119,6 +119,136 @@ curl -X POST http://localhost:3000/find-ride/trips \
 
 ---
 
+## 📂 Database Schema
+
+The core logic revolves around **Trips** (a session of a cab ride) and **RideRequests** (passengers joining that trip).
+
+```mermaid
+erDiagram
+    Users ||--o{ RideRequests : "makes"
+    Drivers ||--|| Cabs : "drives (1:1)"
+    Cabs ||--o{ Trips : "assigned to"
+    Trips ||--|{ RideRequests : "contains"
+
+    Users {
+        String id PK
+        String name
+        String email
+        String password
+        String gender
+        Int age
+    }
+
+    Drivers {
+        String id PK
+        String name
+        String email
+        String gender
+        Int age
+    }
+
+    Cabs {
+        String id PK
+        String cab_number
+        String cab_type
+        Int no_of_seats
+        String status
+        String driver_id FK
+    }
+
+    Trips {
+        String id PK
+        String status "WAITING|ACTIVE|COMPLETED"
+        Int no_of_passengers
+        Int total_luggage
+        Int fare_each
+        String cab_id FKRef
+    }
+
+    RideRequests {
+        String id PK
+        String status
+        Int issued_price
+        String trip_id FK
+        String user_id FK
+    }
+```
+
+---
+
+## 🧩 Ride Matching Algorithm
+
+The matching logic is implemented in `src/rideMatching/demo.js` (prototype) and `src/utils/redisCaching.ts` (production). It uses **H3 (Hexagonal Hierarchical Spatial Index)** to treat routes as strings of characters.
+
+### Approach
+
+1.  **Route Digitization**:
+    *   Fetch route points (Polyline) from **Google Routes API**.
+    *   Convert points to **H3 indices** (Resolution 8, ~460m edge length).
+    *   **Fill Gaps**: Interpolate between points to ensure a continuous chain of hexagons.
+    *   **Result**: A unique string signature representing the path (e.g., `883da1...883da2...`).
+
+2.  **Storage (Redis Sorted Sets)**:
+    *   Stores route signatures in a Lexicographically Sorted Set (`ZSET`).
+    *   Key: `h3:airport_pool`
+    *   Member: `route_signature::user_id`
+
+3.  **Matching Logic**:
+    *   **Exact/Subset Match**: Uses `ZRANGE` with lexicographical search (`[signature`) to find users whose route contains or is contained by the current user's route.
+    *   **Split-Point Analysis (Detour)**:
+        *   Finds the **Longest Common Prefix** (shared route segment) between two candidates.
+        *   Calculates the **Split Point** (where they diverge).
+        *   Computes the "Detour Distance" (distance from Split Point → Candidate Destination).
+        *   **Condition**: If `Detour < Threshold`, it's a match.
+
+### Complexity Analysis
+
+*   **Google API**: $O(1)$ (External latency).
+*   **H3 Conversion**: $O(N)$ where $N$ is the number of route points.
+*   **Redis Insertion**: $O(\log K)$ where $K$ is the number of active users in the pool.
+*   **Matching Query**:
+    *   The lexicographical scan is efficient: $O(\log K + M)$ where $M$ is the number of matches found.
+    *   The "Split Point" string comparison runs in $O(L)$ where $L$ is the route string length.
+
+---
+
+## ⚡ Concurrency Handling Strategy
+
+Ride matching involves heavy array manipulation and string processing (looping over H3 indices, comparing 15-char substrings). Running this on the **Node.js/Bun main thread** would block the Event Loop, causing lag for HTTP/WebSocket requests.
+
+### Solution: Worker Threads
+
+We use a custom **Worker Pool** (`src/workers/workerPool.ts`) to offload CPU-intensive tasks.
+
+1.  **Main Thread**: Handles I/O (Express, WebSockets) and delegates "MATCH_RIDE" tasks.
+2.  **Worker Threads**:
+    *   Independent **Bun Workers**.
+    *   Each worker has its **own isolated Redis & Prisma connection**.
+    *   Tasks are distributed **Round-Robin**.
+3.  **Synchronization**:
+    *   **Redis ZSET** provides atomic operations (`ZADD`, `ZREM`) to prevent race conditions when multiple workers access the pool.
+    *   **Prisma Interactive Transactions** (`prisma.$transaction`) ensure that `Trips` and `RideRequests` are created atomically in Postgres.
+
+---
+
+## 💰 Pricing Approach
+
+Located in `src/utils/redisCaching.ts`.
+
+1.  **Base Fare**:
+    *   `Total Distance (km) * ₹10`.
+    *   Example: 25km ride = ₹250.
+
+2.  **Cab-Pooling Discount**:
+    *   If a match is found, **both users** receive a **70% price factor** (i.e., they pay **70%** of the original fare, saving 30%).
+    *   Example: ₹250 becomes `ceil(250 * 0.7) = ₹175`.
+
+3.  **Consistency**:
+    *   Prices are calculated in Redis during the matching phase.
+    *   The *discounted* price is permanently stored in the `RideRequests` table (`issued_price` column) upon match persistence.
+
+---
+
 ## Project Structure
 
 ```
