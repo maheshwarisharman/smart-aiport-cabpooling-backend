@@ -159,7 +159,7 @@ erDiagram
         Int no_of_seats
         Int luggage_capacity
         String status
-        String driver_id FK UK
+        String driver_id FK
     }
 
     Trips {
