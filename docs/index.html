@@ -1,0 +1,1576 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Smart Airport Cab Pooling API</title>
+    <style type="text/css">
+      body {
+	font-family: Trebuchet MS, sans-serif;
+	font-size: 15px;
+	color: #444;
+	margin-right: 24px;
+}
+
+h1	{
+	font-size: 25px;
+}
+h2	{
+	font-size: 20px;
+}
+h3	{
+	font-size: 16px;
+	font-weight: bold;
+}
+hr	{
+	height: 1px;
+	border: 0;
+	color: #ddd;
+	background-color: #ddd;
+}
+
+.app-desc {
+  clear: both;
+  margin-left: 20px;
+}
+.param-name {
+  width: 100%;
+}
+.license-info {
+  margin-left: 20px;
+}
+
+.license-url {
+  margin-left: 20px;
+}
+
+.model {
+  margin: 0 0 0px 20px;
+}
+
+.method {
+  margin-left: 20px;
+}
+
+.method-notes	{
+	margin: 10px 0 20px 0;
+	font-size: 90%;
+	color: #555;
+}
+
+pre {
+  padding: 10px;
+  margin-bottom: 2px;
+}
+
+.http-method {
+ text-transform: uppercase;
+}
+
+pre.get {
+  background-color: #0f6ab4;
+}
+
+pre.post {
+  background-color: #10a54a;
+}
+
+pre.put {
+  background-color: #c5862b;
+}
+
+pre.delete {
+  background-color: #a41e22;
+}
+
+.huge	{
+	color: #fff;
+}
+
+pre.example {
+  background-color: #f3f3f3;
+  padding: 10px;
+  border: 1px solid #ddd;
+}
+
+code {
+  white-space: pre;
+}
+
+.nickname {
+  font-weight: bold;
+}
+
+.method-path {
+  font-size: 1.5em;
+  background-color: #0f6ab4;
+}
+
+.up {
+  float:right;
+}
+
+.parameter {
+  width: 500px;
+}
+
+.param {
+  width: 500px;
+  padding: 10px 0 0 20px;
+  font-weight: bold;
+}
+
+.param-desc {
+  width: 700px;
+  padding: 0 0 0 20px;
+  color: #777;
+}
+
+.param-type {
+  font-style: italic;
+}
+
+.param-enum-header {
+width: 700px;
+padding: 0 0 0 60px;
+color: #777;
+font-weight: bold;
+}
+
+.param-enum {
+width: 700px;
+padding: 0 0 0 80px;
+color: #777;
+font-style: italic;
+}
+
+.field-label {
+  padding: 0;
+  margin: 0;
+  clear: both;
+}
+
+.field-items	{
+	padding: 0 0 15px 0;
+	margin-bottom: 15px;
+}
+
+.return-type {
+  clear: both;
+  padding-bottom: 10px;
+}
+
+.param-header {
+  font-weight: bold;
+}
+
+.method-tags {
+  text-align: right;
+}
+
+.method-tag {
+  background: none repeat scroll 0% 0% #24A600;
+  border-radius: 3px;
+  padding: 2px 10px;
+  margin: 2px;
+  color: #FFF;
+  display: inline-block;
+  text-decoration: none;
+}
+
+    </style>
+  </head>
+  <body>
+  <h1>Smart Airport Cab Pooling API</h1>
+    <div class="app-desc"><h2>Overview</h2>
+<p>The <strong>Smart Airport Cab Pooling API</strong> powers a ride-sharing platform tailored
+for airport commuters. It matches passengers heading in similar directions,
+pools them into shared cabs, and applies a <strong>70 % discount</strong> on each rider's
+fare when a match is found.</p>
+<h3>Core Workflow</h3>
+<ol>
+<li><strong>Sign Up</strong> — Passengers, drivers, and cabs are registered via the
+<code>/signup</code> endpoints.</li>
+<li><strong>Find a Ride</strong> — A passenger connects through a WebSocket and sends
+their ride details. The server attempts real-time matching using H3
+geospatial indexing and Redis-backed pools.</li>
+<li><strong>Generate OTP</strong> — Once a trip is formed, an OTP is sent to every
+participant.</li>
+<li><strong>Start the Ride</strong> — The driver verifies all OTPs, and the trip
+transitions to <code>ACTIVE</code>.</li>
+<li><strong>Cancel</strong> — Any participant may cancel before the ride starts,
+triggering automatic notifications &amp; trip adjustments.</li>
+</ol>
+<h3>Transport Protocols</h3>
+<p>| Protocol  | Port  | Purpose                                          |
+|-----------|-------|--------------------------------------------------|
+| HTTP/REST | 3000  | CRUD operations, OTP flows, trip queries          |
+| WebSocket | 3001  | Real-time ride matching &amp; live notifications      |</p>
+<h3>Technology Stack</h3>
+<ul>
+<li><strong>Runtime:</strong> Bun</li>
+<li><strong>Framework:</strong> Express 5</li>
+<li><strong>Database:</strong> PostgreSQL (via Prisma ORM)</li>
+<li><strong>Caching / Matching Pool:</strong> Redis (Sorted Sets + Pub/Sub)</li>
+<li><strong>Geospatial:</strong> H3 hexagonal indexing</li>
+<li><strong>Concurrency:</strong> Bun Worker Threads for CPU-intensive matching</li>
+</ul>
+</div>
+    <div class="app-desc">More information: <a href="https://openapi-generator.tech">https://openapi-generator.tech</a></div>
+    <div class="app-desc">Contact Info: <a href="support@smartcabpool.example.com">support@smartcabpool.example.com</a></div>
+    <div class="app-desc">Version: 1.0.0</div>
+    <div class="app-desc">BasePath:</div>
+    <div class="license-info">MIT</div>
+    <div class="license-url">http://apache.org/licenses/LICENSE-2.0.html</div>
+  <h2>Access</h2>
+
+  <h2><a name="__Methods">Methods</a></h2>
+  [ Jump to <a href="#__Models">Models</a> ]
+
+  <h3>Table of Contents </h3>
+  <div class="method-summary"></div>
+  <h4><a href="#Health">Health</a></h4>
+  <ul>
+  <li><a href="#getHealthCheck"><code><span class="http-method">get</span> /</code></a></li>
+  </ul>
+  <h4><a href="#RideLifecycle">RideLifecycle</a></h4>
+  <ul>
+  <li><a href="#cancelRide"><code><span class="http-method">post</span> /cancel-ride/cancel</code></a></li>
+  <li><a href="#generateOtp"><code><span class="http-method">post</span> /ride/generate-otp</code></a></li>
+  <li><a href="#getOtp"><code><span class="http-method">post</span> /ride/get-otp</code></a></li>
+  <li><a href="#startRide"><code><span class="http-method">post</span> /ride/start</code></a></li>
+  </ul>
+  <h4><a href="#Rides">Rides</a></h4>
+  <ul>
+  <li><a href="#getUserTrips"><code><span class="http-method">post</span> /find-ride/trips</code></a></li>
+  </ul>
+  <h4><a href="#Signup">Signup</a></h4>
+  <ul>
+  <li><a href="#signupCab"><code><span class="http-method">post</span> /signup/cab</code></a></li>
+  <li><a href="#signupDriver"><code><span class="http-method">post</span> /signup/driver</code></a></li>
+  <li><a href="#signupUser"><code><span class="http-method">post</span> /signup/user</code></a></li>
+  </ul>
+
+  <h1><a name="Health">Health</a></h1>
+  <div class="method"><a name="getHealthCheck"/>
+    <div class="method-path">
+    <a class="up" href="#__Methods">Up</a>
+    <pre class="get"><code class="huge"><span class="http-method">get</span> /</code></pre></div>
+    <div class="method-summary">Server health check (<span class="nickname">getHealthCheck</span>)</div>
+    <div class="method-notes">Returns the operational status of the server, including the number of
+active worker threads and any pending ride-matching tasks.</div>
+
+
+
+
+
+
+
+    <h3 class="field-label">Return type</h3>
+    <div class="return-type">
+      <a href="#HealthCheckResponse">HealthCheckResponse</a>
+      
+    </div>
+
+    <!--Todo: process Response Object and its headers, schema, examples -->
+
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: application/json</div>
+    <pre class="example"><code>{
+  "pendingTasks" : 6,
+  "workers" : 0,
+  "status" : "ok"
+}</code></pre>
+
+    <h3 class="field-label">Produces</h3>
+    This API call produces the following media types according to the <span class="header">Accept</span> request header;
+    the media type will be conveyed by the <span class="header">Content-Type</span> response header.
+    <ul>
+      <li><code>application/json</code></li>
+    </ul>
+
+    <h3 class="field-label">Responses</h3>
+    <h4 class="field-label">200</h4>
+    Server is healthy.
+        <a href="#HealthCheckResponse">HealthCheckResponse</a>
+  </div> <!-- method -->
+  <hr/>
+  <h1><a name="RideLifecycle">RideLifecycle</a></h1>
+  <div class="method"><a name="cancelRide"/>
+    <div class="method-path">
+    <a class="up" href="#__Methods">Up</a>
+    <pre class="post"><code class="huge"><span class="http-method">post</span> /cancel-ride/cancel</code></pre></div>
+    <div class="method-summary">Cancel a user's participation in a trip (<span class="nickname">cancelRide</span>)</div>
+    <div class="method-notes"><p>Removes a user from a trip. The outcome depends on how many riders
+remain:</p>
+<p>| Riders Before | Scenario             | Trip Status After | Notifications                              |
+|---------------|----------------------|-------------------|--------------------------------------------|
+| 1 (solo)      | <code>SOLO_CANCELLATION</code>  | <code>CANCELLED</code>       | None                                       |
+| 2             | <code>TRIP_CANCELLED</code>     | <code>CANCELLED</code>       | Remaining rider notified via Pub/Sub       |
+| 3 +           | <code>RIDER_REMOVED</code>      | <code>WAITING</code> (cont.) | All remaining riders notified via Pub/Sub  |</p>
+<h3>Guard Rails</h3>
+<ul>
+<li>Cannot cancel an <code>ACTIVE</code>, <code>COMPLETED</code>, or already <code>CANCELLED</code> trip.</li>
+<li>The requesting user must belong to the trip.</li>
+</ul>
+<h3>Side Effects</h3>
+<ul>
+<li>Redis pool entries for the cancelled user are cleaned up via worker
+threads (non-blocking).</li>
+<li>If a 2-rider trip is cancelled and a cab was assigned, the cab status
+is reset to <code>AVAILABLE</code>.</li>
+</ul>
+</div>
+
+
+    <h3 class="field-label">Consumes</h3>
+    This API call consumes the following media types via the <span class="header">Content-Type</span> request header:
+    <ul>
+      <li><code>application/json</code></li>
+    </ul>
+
+    <h3 class="field-label">Request body</h3>
+    <div class="field-items">
+      <div class="param">CancelRideRequest <a href="#CancelRideRequest">CancelRideRequest</a> (required)</div>
+
+      <div class="param-desc"><span class="param-type">Body Parameter</span> &mdash;  </div>
+
+    </div>  <!-- field-items -->
+
+
+
+
+    <h3 class="field-label">Return type</h3>
+    <div class="return-type">
+      <a href="#CancelRideResponse">CancelRideResponse</a>
+      
+    </div>
+
+    <!--Todo: process Response Object and its headers, schema, examples -->
+
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: application/json</div>
+    <pre class="example"><code>{
+  "trip_id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+  "scenario" : "SOLO_CANCELLATION",
+  "notified_users" : [ "046b6c7f-0b8a-43b9-b35d-6489e6daee91", "046b6c7f-0b8a-43b9-b35d-6489e6daee91" ],
+  "remaining_riders" : 0,
+  "message" : "message",
+  "notified_user" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+}</code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: application/json</div>
+    <pre class="example"><code>{
+  "error" : "An error occurred"
+}</code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: application/json</div>
+    <pre class="example"><code>{
+  "error" : "An error occurred"
+}</code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: application/json</div>
+    <pre class="example"><code>{
+  "error" : "An error occurred"
+}</code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: application/json</div>
+    <pre class="example"><code>{
+  "error" : "An error occurred"
+}</code></pre>
+
+    <h3 class="field-label">Produces</h3>
+    This API call produces the following media types according to the <span class="header">Accept</span> request header;
+    the media type will be conveyed by the <span class="header">Content-Type</span> response header.
+    <ul>
+      <li><code>application/json</code></li>
+    </ul>
+
+    <h3 class="field-label">Responses</h3>
+    <h4 class="field-label">200</h4>
+    Cancellation processed successfully.
+        <a href="#CancelRideResponse">CancelRideResponse</a>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: </div>
+    <pre class="example"><code></code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: </div>
+    <pre class="example"><code></code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: </div>
+    <pre class="example"><code></code></pre>
+    <h4 class="field-label">400</h4>
+    Missing or invalid input.
+        <a href="#ErrorResponse">ErrorResponse</a>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: </div>
+    <pre class="example"><code></code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: </div>
+    <pre class="example"><code></code></pre>
+    <h4 class="field-label">404</h4>
+    Trip or user not found.
+        <a href="#ErrorResponse">ErrorResponse</a>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: </div>
+    <pre class="example"><code></code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: </div>
+    <pre class="example"><code></code></pre>
+    <h4 class="field-label">409</h4>
+    Trip is in a conflicting state.
+        <a href="#ErrorResponse">ErrorResponse</a>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: </div>
+    <pre class="example"><code></code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: </div>
+    <pre class="example"><code></code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: </div>
+    <pre class="example"><code></code></pre>
+    <h4 class="field-label">500</h4>
+    An unexpected error occurred on the server.
+        <a href="#ErrorResponse">ErrorResponse</a>
+  </div> <!-- method -->
+  <hr/>
+  <div class="method"><a name="generateOtp"/>
+    <div class="method-path">
+    <a class="up" href="#__Methods">Up</a>
+    <pre class="post"><code class="huge"><span class="http-method">post</span> /ride/generate-otp</code></pre></div>
+    <div class="method-summary">Generate OTPs for all users in a trip (<span class="nickname">generateOtp</span>)</div>
+    <div class="method-notes"><p>Generates a unique <strong>6-digit OTP</strong> for every passenger associated with
+the specified trip and stores it on each user's record in the database.</p>
+<p>The OTP expires after <strong>5 minutes</strong>.</p>
+<ul>
+<li>Trip must be in <code>WAITING</code> status.</li>
+<li>Trip must have at least one ride request.</li>
+</ul>
+<blockquote>
+<p><strong>Dev Note:</strong> In production, OTPs would be dispatched via SMS or push
+notification. This endpoint currently stores them in the DB only.</p>
+</blockquote>
+</div>
+
+
+    <h3 class="field-label">Consumes</h3>
+    This API call consumes the following media types via the <span class="header">Content-Type</span> request header:
+    <ul>
+      <li><code>application/json</code></li>
+    </ul>
+
+    <h3 class="field-label">Request body</h3>
+    <div class="field-items">
+      <div class="param">generateOtp_request <a href="#generateOtp_request">generateOtp_request</a> (required)</div>
+
+      <div class="param-desc"><span class="param-type">Body Parameter</span> &mdash;  </div>
+
+    </div>  <!-- field-items -->
+
+
+
+
+    <h3 class="field-label">Return type</h3>
+    <div class="return-type">
+      <a href="#GenerateOtpResponse">GenerateOtpResponse</a>
+      
+    </div>
+
+    <!--Todo: process Response Object and its headers, schema, examples -->
+
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: application/json</div>
+    <pre class="example"><code>{
+  "otp_expiry" : "2000-01-23T04:56:07.000+00:00",
+  "trip_id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+  "message" : "message"
+}</code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: application/json</div>
+    <pre class="example"><code>{
+  "error" : "An error occurred"
+}</code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: application/json</div>
+    <pre class="example"><code>{
+  "error" : "An error occurred"
+}</code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: application/json</div>
+    <pre class="example"><code>{
+  "error" : "An error occurred"
+}</code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: application/json</div>
+    <pre class="example"><code>{
+  "error" : "An error occurred"
+}</code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: application/json</div>
+    <pre class="example"><code>{
+  "error" : "An error occurred"
+}</code></pre>
+
+    <h3 class="field-label">Produces</h3>
+    This API call produces the following media types according to the <span class="header">Accept</span> request header;
+    the media type will be conveyed by the <span class="header">Content-Type</span> response header.
+    <ul>
+      <li><code>application/json</code></li>
+    </ul>
+
+    <h3 class="field-label">Responses</h3>
+    <h4 class="field-label">200</h4>
+    OTPs generated successfully for all users in the trip.
+        <a href="#GenerateOtpResponse">GenerateOtpResponse</a>
+    <h4 class="field-label">400</h4>
+    Missing or invalid <code>trip_id</code>.
+        <a href="#ErrorResponse">ErrorResponse</a>
+    <h4 class="field-label">404</h4>
+    Trip not found.
+        <a href="#ErrorResponse">ErrorResponse</a>
+    <h4 class="field-label">409</h4>
+    Trip is in a conflicting state (already active, completed, or cancelled).
+        <a href="#ErrorResponse">ErrorResponse</a>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: </div>
+    <pre class="example"><code></code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: </div>
+    <pre class="example"><code></code></pre>
+    <h4 class="field-label">422</h4>
+    Trip has no ride requests / users.
+        <a href="#ErrorResponse">ErrorResponse</a>
+    <h4 class="field-label">500</h4>
+    An unexpected error occurred on the server.
+        <a href="#ErrorResponse">ErrorResponse</a>
+  </div> <!-- method -->
+  <hr/>
+  <div class="method"><a name="getOtp"/>
+    <div class="method-path">
+    <a class="up" href="#__Methods">Up</a>
+    <pre class="post"><code class="huge"><span class="http-method">post</span> /ride/get-otp</code></pre></div>
+    <div class="method-summary">Retrieve the current OTP for a user (<span class="nickname">getOtp</span>)</div>
+    <div class="method-notes"><p>Returns the active OTP for a passenger. This is intended for the
+client app to display the OTP so the user can show it to the driver.</p>
+<ul>
+<li>Returns <code>404</code> if no OTP has been generated.</li>
+<li>Returns <code>410 Gone</code> if the OTP has expired.</li>
+</ul>
+</div>
+
+
+    <h3 class="field-label">Consumes</h3>
+    This API call consumes the following media types via the <span class="header">Content-Type</span> request header:
+    <ul>
+      <li><code>application/json</code></li>
+    </ul>
+
+    <h3 class="field-label">Request body</h3>
+    <div class="field-items">
+      <div class="param">getOtp_request <a href="#getOtp_request">getOtp_request</a> (required)</div>
+
+      <div class="param-desc"><span class="param-type">Body Parameter</span> &mdash;  </div>
+
+    </div>  <!-- field-items -->
+
+
+
+
+    <h3 class="field-label">Return type</h3>
+    <div class="return-type">
+      <a href="#getOtp_200_response">getOtp_200_response</a>
+      
+    </div>
+
+    <!--Todo: process Response Object and its headers, schema, examples -->
+
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: application/json</div>
+    <pre class="example"><code>{
+  "otp" : 482913
+}</code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: application/json</div>
+    <pre class="example"><code>{
+  "error" : "An error occurred"
+}</code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: application/json</div>
+    <pre class="example"><code>{
+  "error" : "An error occurred"
+}</code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: application/json</div>
+    <pre class="example"><code>{
+  "error" : "An error occurred"
+}</code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: application/json</div>
+    <pre class="example"><code>{
+  "error" : "An error occurred"
+}</code></pre>
+
+    <h3 class="field-label">Produces</h3>
+    This API call produces the following media types according to the <span class="header">Accept</span> request header;
+    the media type will be conveyed by the <span class="header">Content-Type</span> response header.
+    <ul>
+      <li><code>application/json</code></li>
+    </ul>
+
+    <h3 class="field-label">Responses</h3>
+    <h4 class="field-label">200</h4>
+    OTP retrieved successfully.
+        <a href="#getOtp_200_response">getOtp_200_response</a>
+    <h4 class="field-label">400</h4>
+    Missing or invalid <code>user_id</code>.
+        <a href="#ErrorResponse">ErrorResponse</a>
+    <h4 class="field-label">404</h4>
+    User not found or no OTP generated.
+        <a href="#ErrorResponse">ErrorResponse</a>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: </div>
+    <pre class="example"><code></code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: </div>
+    <pre class="example"><code></code></pre>
+    <h4 class="field-label">410</h4>
+    OTP has expired.
+        <a href="#ErrorResponse">ErrorResponse</a>
+    <h4 class="field-label">500</h4>
+    An unexpected error occurred on the server.
+        <a href="#ErrorResponse">ErrorResponse</a>
+  </div> <!-- method -->
+  <hr/>
+  <div class="method"><a name="startRide"/>
+    <div class="method-path">
+    <a class="up" href="#__Methods">Up</a>
+    <pre class="post"><code class="huge"><span class="http-method">post</span> /ride/start</code></pre></div>
+    <div class="method-summary">Verify OTPs and start the ride (<span class="nickname">startRide</span>)</div>
+    <div class="method-notes"><p>Verifies the OTP of <strong>every</strong> user in the trip. If all verifications
+pass:</p>
+<ol>
+<li>OTP fields are cleared on each user record.</li>
+<li>The trip status transitions to <code>ACTIVE</code>.</li>
+<li>All associated ride requests transition to <code>ACTIVE</code>.</li>
+</ol>
+<p><strong>All database writes are executed atomically</strong> inside a single
+Prisma transaction.</p>
+<h3>Failure Modes</h3>
+<ul>
+<li>If <strong>any</strong> OTP is invalid, expired, or missing, the entire request
+is rejected with details about which verifications failed.</li>
+<li>Verifications for users not belonging to the trip, or missing users
+in the trip, are rejected.</li>
+</ul>
+</div>
+
+
+    <h3 class="field-label">Consumes</h3>
+    This API call consumes the following media types via the <span class="header">Content-Type</span> request header:
+    <ul>
+      <li><code>application/json</code></li>
+    </ul>
+
+    <h3 class="field-label">Request body</h3>
+    <div class="field-items">
+      <div class="param">StartRideRequest <a href="#StartRideRequest">StartRideRequest</a> (required)</div>
+
+      <div class="param-desc"><span class="param-type">Body Parameter</span> &mdash;  </div>
+
+    </div>  <!-- field-items -->
+
+
+
+
+    <h3 class="field-label">Return type</h3>
+    <div class="return-type">
+      <a href="#StartRideResponse">StartRideResponse</a>
+      
+    </div>
+
+    <!--Todo: process Response Object and its headers, schema, examples -->
+
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: application/json</div>
+    <pre class="example"><code>{
+  "trip_id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+  "activated_users" : [ "046b6c7f-0b8a-43b9-b35d-6489e6daee91", "046b6c7f-0b8a-43b9-b35d-6489e6daee91" ],
+  "activated_ride_requests" : [ "046b6c7f-0b8a-43b9-b35d-6489e6daee91", "046b6c7f-0b8a-43b9-b35d-6489e6daee91" ],
+  "message" : "message",
+  "status" : "ACTIVE"
+}</code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: application/json</div>
+    <pre class="example"><code>{
+  "error" : "An error occurred"
+}</code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: application/json</div>
+    <pre class="example"><code>{
+  "failed" : [ {
+    "reason" : "reason",
+    "user_id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+  }, {
+    "reason" : "reason",
+    "user_id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+  } ],
+  "error" : "error"
+}</code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: application/json</div>
+    <pre class="example"><code>{
+  "error" : "An error occurred"
+}</code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: application/json</div>
+    <pre class="example"><code>{
+  "error" : "An error occurred"
+}</code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: application/json</div>
+    <pre class="example"><code>{
+  "error" : "An error occurred"
+}</code></pre>
+
+    <h3 class="field-label">Produces</h3>
+    This API call produces the following media types according to the <span class="header">Accept</span> request header;
+    the media type will be conveyed by the <span class="header">Content-Type</span> response header.
+    <ul>
+      <li><code>application/json</code></li>
+    </ul>
+
+    <h3 class="field-label">Responses</h3>
+    <h4 class="field-label">200</h4>
+    All OTPs verified — ride is now active.
+        <a href="#StartRideResponse">StartRideResponse</a>
+    <h4 class="field-label">400</h4>
+    Invalid or incomplete request payload.
+        <a href="#ErrorResponse">ErrorResponse</a>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: </div>
+    <pre class="example"><code></code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: </div>
+    <pre class="example"><code></code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: </div>
+    <pre class="example"><code></code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: </div>
+    <pre class="example"><code></code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: </div>
+    <pre class="example"><code></code></pre>
+    <h4 class="field-label">401</h4>
+    One or more OTP verifications failed.
+        <a href="#OtpVerificationFailedResponse">OtpVerificationFailedResponse</a>
+    <h4 class="field-label">404</h4>
+    Trip not found.
+        <a href="#ErrorResponse">ErrorResponse</a>
+    <h4 class="field-label">409</h4>
+    Trip is in a conflicting state.
+        <a href="#ErrorResponse">ErrorResponse</a>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: </div>
+    <pre class="example"><code></code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: </div>
+    <pre class="example"><code></code></pre>
+    <h4 class="field-label">500</h4>
+    An unexpected error occurred on the server.
+        <a href="#ErrorResponse">ErrorResponse</a>
+  </div> <!-- method -->
+  <hr/>
+  <h1><a name="Rides">Rides</a></h1>
+  <div class="method"><a name="getUserTrips"/>
+    <div class="method-path">
+    <a class="up" href="#__Methods">Up</a>
+    <pre class="post"><code class="huge"><span class="http-method">post</span> /find-ride/trips</code></pre></div>
+    <div class="method-summary">Get all trips for a user (<span class="nickname">getUserTrips</span>)</div>
+    <div class="method-notes"><p>Retrieves every trip (and its nested data) that a specific user has
+participated in. The response includes:</p>
+<ul>
+<li><strong>Trip</strong> details (status, fare, passenger/luggage counts)</li>
+<li><strong>Assigned cab</strong> and its <strong>driver</strong> information</li>
+<li><strong>All ride requests</strong> within the trip, each with the rider's profile</li>
+</ul>
+</div>
+
+
+    <h3 class="field-label">Consumes</h3>
+    This API call consumes the following media types via the <span class="header">Content-Type</span> request header:
+    <ul>
+      <li><code>application/json</code></li>
+    </ul>
+
+    <h3 class="field-label">Request body</h3>
+    <div class="field-items">
+      <div class="param">getUserTrips_request <a href="#getUserTrips_request">getUserTrips_request</a> (required)</div>
+
+      <div class="param-desc"><span class="param-type">Body Parameter</span> &mdash;  </div>
+
+    </div>  <!-- field-items -->
+
+
+
+
+    <h3 class="field-label">Return type</h3>
+    <div class="return-type">
+      <a href="#UserTripsResponse">UserTripsResponse</a>
+      
+    </div>
+
+    <!--Todo: process Response Object and its headers, schema, examples -->
+
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: application/json</div>
+    <pre class="example"><code>{
+  "trips" : [ {
+    "joined_at" : "2000-01-23T04:56:07.000+00:00",
+    "trip_id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+    "trip" : {
+      "fare_each" : 5,
+      "cab_id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+      "cab" : "",
+      "total_luggage" : 2,
+      "created_at" : "2000-01-23T04:56:07.000+00:00",
+      "id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+      "no_of_passengers" : 5,
+      "rideRequests" : [ {
+        "joined_at" : "2000-01-23T04:56:07.000+00:00",
+        "trip_id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+        "user_id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+        "issued_price" : 3,
+        "id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+        "no_of_passengers" : 7,
+        "user" : {
+          "gender" : "gender",
+          "name" : "name",
+          "age" : 2
+        },
+        "luggage_capacity" : 9
+      }, {
+        "joined_at" : "2000-01-23T04:56:07.000+00:00",
+        "trip_id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+        "user_id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+        "issued_price" : 3,
+        "id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+        "no_of_passengers" : 7,
+        "user" : {
+          "gender" : "gender",
+          "name" : "name",
+          "age" : 2
+        },
+        "luggage_capacity" : 9
+      } ],
+      "status" : "WAITING"
+    },
+    "user_id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+    "issued_price" : 1,
+    "id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+    "no_of_passengers" : 0,
+    "status" : "WAITING",
+    "luggage_capacity" : 6
+  }, {
+    "joined_at" : "2000-01-23T04:56:07.000+00:00",
+    "trip_id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+    "trip" : {
+      "fare_each" : 5,
+      "cab_id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+      "cab" : "",
+      "total_luggage" : 2,
+      "created_at" : "2000-01-23T04:56:07.000+00:00",
+      "id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+      "no_of_passengers" : 5,
+      "rideRequests" : [ {
+        "joined_at" : "2000-01-23T04:56:07.000+00:00",
+        "trip_id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+        "user_id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+        "issued_price" : 3,
+        "id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+        "no_of_passengers" : 7,
+        "user" : {
+          "gender" : "gender",
+          "name" : "name",
+          "age" : 2
+        },
+        "luggage_capacity" : 9
+      }, {
+        "joined_at" : "2000-01-23T04:56:07.000+00:00",
+        "trip_id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+        "user_id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+        "issued_price" : 3,
+        "id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+        "no_of_passengers" : 7,
+        "user" : {
+          "gender" : "gender",
+          "name" : "name",
+          "age" : 2
+        },
+        "luggage_capacity" : 9
+      } ],
+      "status" : "WAITING"
+    },
+    "user_id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+    "issued_price" : 1,
+    "id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+    "no_of_passengers" : 0,
+    "status" : "WAITING",
+    "luggage_capacity" : 6
+  } ]
+}</code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: application/json</div>
+    <pre class="example"><code>{
+  "error" : "An error occurred"
+}</code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: application/json</div>
+    <pre class="example"><code>{
+  "error" : "An error occurred"
+}</code></pre>
+
+    <h3 class="field-label">Produces</h3>
+    This API call produces the following media types according to the <span class="header">Accept</span> request header;
+    the media type will be conveyed by the <span class="header">Content-Type</span> response header.
+    <ul>
+      <li><code>application/json</code></li>
+    </ul>
+
+    <h3 class="field-label">Responses</h3>
+    <h4 class="field-label">200</h4>
+    Trips retrieved successfully.
+        <a href="#UserTripsResponse">UserTripsResponse</a>
+    <h4 class="field-label">400</h4>
+    Missing or invalid <code>user_id</code>.
+        <a href="#ErrorResponse">ErrorResponse</a>
+    <h4 class="field-label">500</h4>
+    An unexpected error occurred on the server.
+        <a href="#ErrorResponse">ErrorResponse</a>
+  </div> <!-- method -->
+  <hr/>
+  <h1><a name="Signup">Signup</a></h1>
+  <div class="method"><a name="signupCab"/>
+    <div class="method-path">
+    <a class="up" href="#__Methods">Up</a>
+    <pre class="post"><code class="huge"><span class="http-method">post</span> /signup/cab</code></pre></div>
+    <div class="method-summary">Register a cab linked to a driver (<span class="nickname">signupCab</span>)</div>
+    <div class="method-notes"><p>Adds a new cab to the fleet and associates it with an existing driver.
+Each driver can have exactly <strong>one</strong> cab (1:1 relationship).</p>
+<p>The cab's <code>status</code> defaults to <code>AVAILABLE</code>.</p>
+</div>
+
+
+    <h3 class="field-label">Consumes</h3>
+    This API call consumes the following media types via the <span class="header">Content-Type</span> request header:
+    <ul>
+      <li><code>application/json</code></li>
+    </ul>
+
+    <h3 class="field-label">Request body</h3>
+    <div class="field-items">
+      <div class="param">CabSignupRequest <a href="#CabSignupRequest">CabSignupRequest</a> (required)</div>
+
+      <div class="param-desc"><span class="param-type">Body Parameter</span> &mdash;  </div>
+
+    </div>  <!-- field-items -->
+
+
+
+
+    <h3 class="field-label">Return type</h3>
+    <div class="return-type">
+      <a href="#CabSignupResponse">CabSignupResponse</a>
+      
+    </div>
+
+    <!--Todo: process Response Object and its headers, schema, examples -->
+
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: application/json</div>
+    <pre class="example"><code>{
+  "cab" : {
+    "driver_id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+    "cab_number" : "cab_number",
+    "no_of_seats" : 0,
+    "cab_type" : "cab_type",
+    "id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+    "luggage_capacity" : 6,
+    "status" : "AVAILABLE"
+  },
+  "message" : "message"
+}</code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: application/json</div>
+    <pre class="example"><code>{
+  "error" : "An error occurred"
+}</code></pre>
+
+    <h3 class="field-label">Produces</h3>
+    This API call produces the following media types according to the <span class="header">Accept</span> request header;
+    the media type will be conveyed by the <span class="header">Content-Type</span> response header.
+    <ul>
+      <li><code>application/json</code></li>
+    </ul>
+
+    <h3 class="field-label">Responses</h3>
+    <h4 class="field-label">201</h4>
+    Cab added successfully.
+        <a href="#CabSignupResponse">CabSignupResponse</a>
+    <h4 class="field-label">500</h4>
+    An unexpected error occurred on the server.
+        <a href="#ErrorResponse">ErrorResponse</a>
+  </div> <!-- method -->
+  <hr/>
+  <div class="method"><a name="signupDriver"/>
+    <div class="method-path">
+    <a class="up" href="#__Methods">Up</a>
+    <pre class="post"><code class="huge"><span class="http-method">post</span> /signup/driver</code></pre></div>
+    <div class="method-summary">Register a new driver (<span class="nickname">signupDriver</span>)</div>
+    <div class="method-notes">Creates a new driver account. After signing up, a cab must be
+registered separately via <code>POST /signup/cab</code> and linked to this
+driver by <code>driver_id</code>.</div>
+
+
+    <h3 class="field-label">Consumes</h3>
+    This API call consumes the following media types via the <span class="header">Content-Type</span> request header:
+    <ul>
+      <li><code>application/json</code></li>
+    </ul>
+
+    <h3 class="field-label">Request body</h3>
+    <div class="field-items">
+      <div class="param">DriverSignupRequest <a href="#DriverSignupRequest">DriverSignupRequest</a> (required)</div>
+
+      <div class="param-desc"><span class="param-type">Body Parameter</span> &mdash;  </div>
+
+    </div>  <!-- field-items -->
+
+
+
+
+    <h3 class="field-label">Return type</h3>
+    <div class="return-type">
+      <a href="#DriverSignupResponse">DriverSignupResponse</a>
+      
+    </div>
+
+    <!--Todo: process Response Object and its headers, schema, examples -->
+
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: application/json</div>
+    <pre class="example"><code>{
+  "driver" : {
+    "createdAt" : "2000-01-23T04:56:07.000+00:00",
+    "gender" : "gender",
+    "name" : "name",
+    "id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+    "email" : "email",
+    "age" : 0
+  },
+  "message" : "message"
+}</code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: application/json</div>
+    <pre class="example"><code>{
+  "error" : "An error occurred"
+}</code></pre>
+
+    <h3 class="field-label">Produces</h3>
+    This API call produces the following media types according to the <span class="header">Accept</span> request header;
+    the media type will be conveyed by the <span class="header">Content-Type</span> response header.
+    <ul>
+      <li><code>application/json</code></li>
+    </ul>
+
+    <h3 class="field-label">Responses</h3>
+    <h4 class="field-label">201</h4>
+    Driver created successfully.
+        <a href="#DriverSignupResponse">DriverSignupResponse</a>
+    <h4 class="field-label">500</h4>
+    An unexpected error occurred on the server.
+        <a href="#ErrorResponse">ErrorResponse</a>
+  </div> <!-- method -->
+  <hr/>
+  <div class="method"><a name="signupUser"/>
+    <div class="method-path">
+    <a class="up" href="#__Methods">Up</a>
+    <pre class="post"><code class="huge"><span class="http-method">post</span> /signup/user</code></pre></div>
+    <div class="method-summary">Register a new passenger (<span class="nickname">signupUser</span>)</div>
+    <div class="method-notes"><p>Creates a new passenger account. The user can then connect via WebSocket
+to find and join shared rides.</p>
+<blockquote>
+<p><strong>Note:</strong> Validation and authentication layers are not yet implemented.
+All fields are currently accepted as-is.</p>
+</blockquote>
+</div>
+
+
+    <h3 class="field-label">Consumes</h3>
+    This API call consumes the following media types via the <span class="header">Content-Type</span> request header:
+    <ul>
+      <li><code>application/json</code></li>
+    </ul>
+
+    <h3 class="field-label">Request body</h3>
+    <div class="field-items">
+      <div class="param">UserSignupRequest <a href="#UserSignupRequest">UserSignupRequest</a> (required)</div>
+
+      <div class="param-desc"><span class="param-type">Body Parameter</span> &mdash;  </div>
+
+    </div>  <!-- field-items -->
+
+
+
+
+    <h3 class="field-label">Return type</h3>
+    <div class="return-type">
+      <a href="#UserSignupResponse">UserSignupResponse</a>
+      
+    </div>
+
+    <!--Todo: process Response Object and its headers, schema, examples -->
+
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: application/json</div>
+    <pre class="example"><code>{
+  "message" : "message",
+  "user" : {
+    "createdAt" : "2000-01-23T04:56:07.000+00:00",
+    "ride_otp" : 6,
+    "otp_expiry" : "2000-01-23T04:56:07.000+00:00",
+    "gender" : "gender",
+    "name" : "name",
+    "id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+    "email" : "email",
+    "age" : 0
+  }
+}</code></pre>
+    <h3 class="field-label">Example data</h3>
+    <div class="example-data-content-type">Content-Type: application/json</div>
+    <pre class="example"><code>{
+  "error" : "An error occurred"
+}</code></pre>
+
+    <h3 class="field-label">Produces</h3>
+    This API call produces the following media types according to the <span class="header">Accept</span> request header;
+    the media type will be conveyed by the <span class="header">Content-Type</span> response header.
+    <ul>
+      <li><code>application/json</code></li>
+    </ul>
+
+    <h3 class="field-label">Responses</h3>
+    <h4 class="field-label">201</h4>
+    User created successfully.
+        <a href="#UserSignupResponse">UserSignupResponse</a>
+    <h4 class="field-label">500</h4>
+    An unexpected error occurred on the server.
+        <a href="#ErrorResponse">ErrorResponse</a>
+  </div> <!-- method -->
+  <hr/>
+
+  <h2><a name="__Models">Models</a></h2>
+  [ Jump to <a href="#__Methods">Methods</a> ]
+
+  <h3>Table of Contents</h3>
+  <ol>
+    <li><a href="#Cab"><code>Cab</code> - </a></li>
+    <li><a href="#CabSignupRequest"><code>CabSignupRequest</code> - </a></li>
+    <li><a href="#CabSignupResponse"><code>CabSignupResponse</code> - </a></li>
+    <li><a href="#CabStatus"><code>CabStatus</code> - </a></li>
+    <li><a href="#CabWithDriver"><code>CabWithDriver</code> - </a></li>
+    <li><a href="#CancelRideRequest"><code>CancelRideRequest</code> - </a></li>
+    <li><a href="#CancelRideResponse"><code>CancelRideResponse</code> - </a></li>
+    <li><a href="#Driver"><code>Driver</code> - </a></li>
+    <li><a href="#DriverSignupRequest"><code>DriverSignupRequest</code> - </a></li>
+    <li><a href="#DriverSignupResponse"><code>DriverSignupResponse</code> - </a></li>
+    <li><a href="#ErrorResponse"><code>ErrorResponse</code> - </a></li>
+    <li><a href="#GenerateOtpResponse"><code>GenerateOtpResponse</code> - </a></li>
+    <li><a href="#HealthCheckResponse"><code>HealthCheckResponse</code> - </a></li>
+    <li><a href="#OtpVerificationEntry"><code>OtpVerificationEntry</code> - </a></li>
+    <li><a href="#OtpVerificationFailedResponse"><code>OtpVerificationFailedResponse</code> - </a></li>
+    <li><a href="#OtpVerificationFailedResponse_failed_inner"><code>OtpVerificationFailedResponse_failed_inner</code> - </a></li>
+    <li><a href="#RideRequest"><code>RideRequest</code> - </a></li>
+    <li><a href="#RideRequestStatus"><code>RideRequestStatus</code> - </a></li>
+    <li><a href="#RideRequestWithTrip"><code>RideRequestWithTrip</code> - </a></li>
+    <li><a href="#RideRequestWithUser"><code>RideRequestWithUser</code> - </a></li>
+    <li><a href="#RideRequestWithUser_user"><code>RideRequestWithUser_user</code> - </a></li>
+    <li><a href="#StartRideRequest"><code>StartRideRequest</code> - </a></li>
+    <li><a href="#StartRideResponse"><code>StartRideResponse</code> - </a></li>
+    <li><a href="#Trip"><code>Trip</code> - </a></li>
+    <li><a href="#TripStatus"><code>TripStatus</code> - </a></li>
+    <li><a href="#TripWithDetails"><code>TripWithDetails</code> - </a></li>
+    <li><a href="#User"><code>User</code> - </a></li>
+    <li><a href="#UserSignupRequest"><code>UserSignupRequest</code> - </a></li>
+    <li><a href="#UserSignupResponse"><code>UserSignupResponse</code> - </a></li>
+    <li><a href="#UserTripsResponse"><code>UserTripsResponse</code> - </a></li>
+    <li><a href="#generateOtp_request"><code>generateOtp_request</code> - </a></li>
+    <li><a href="#getOtp_200_response"><code>getOtp_200_response</code> - </a></li>
+    <li><a href="#getOtp_request"><code>getOtp_request</code> - </a></li>
+    <li><a href="#getUserTrips_request"><code>getUserTrips_request</code> - </a></li>
+  </ol>
+
+  <div class="model">
+    <h3><a name="Cab"><code>Cab</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'>A registered cab vehicle.</div>
+    <div class="field-items">
+      <div class="param">id (optional)</div><div class="param-desc"><span class="param-type"><a href="#UUID">UUID</a></span>  format: uuid</div>
+<div class="param">cab_number (optional)</div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span> Unique vehicle registration number. </div>
+<div class="param">cab_type (optional)</div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+<div class="param">no_of_seats (optional)</div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span>  </div>
+<div class="param">luggage_capacity (optional)</div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span>  </div>
+<div class="param">status (optional)</div><div class="param-desc"><span class="param-type"><a href="#CabStatus">CabStatus</a></span>  </div>
+<div class="param">driver_id (optional)</div><div class="param-desc"><span class="param-type"><a href="#UUID">UUID</a></span>  format: uuid</div>
+    </div>  <!-- field-items -->
+  </div>
+  <div class="model">
+    <h3><a name="CabSignupRequest"><code>CabSignupRequest</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'></div>
+    <div class="field-items">
+      <div class="param">cab_number </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span> Unique registration number of the cab. </div>
+<div class="param">cab_type </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span> Type/category of the vehicle (e.g., Sedan, SUV, Hatchback). </div>
+<div class="param">no_of_seats </div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span> Total passenger seating capacity. </div>
+<div class="param">luggage_capacity </div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span> Maximum number of luggage items the cab can hold. </div>
+<div class="param">driver_id </div><div class="param-desc"><span class="param-type"><a href="#UUID">UUID</a></span> UUID of the driver this cab belongs to. Each driver can own exactly one cab. format: uuid</div>
+    </div>  <!-- field-items -->
+  </div>
+  <div class="model">
+    <h3><a name="CabSignupResponse"><code>CabSignupResponse</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'></div>
+    <div class="field-items">
+      <div class="param">message </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+<div class="param">cab </div><div class="param-desc"><span class="param-type"><a href="#Cab">Cab</a></span>  </div>
+    </div>  <!-- field-items -->
+  </div>
+  <div class="model">
+    <h3><a name="CabStatus"><code>CabStatus</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'><p>Operational status of a cab:</p>
+<ul>
+<li><code>AVAILABLE</code> — Cab is free and can be assigned to a trip.</li>
+<li><code>ASSIGNED</code> — Cab has been assigned to a trip but the ride hasn't started.</li>
+<li><code>ON_TRIP</code> — Cab is currently on an active ride.</li>
+</ul>
+</div>
+    <div class="field-items">
+          </div>  <!-- field-items -->
+  </div>
+  <div class="model">
+    <h3><a name="CabWithDriver"><code>CabWithDriver</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'>A cab with its associated driver profile.</div>
+    <div class="field-items">
+      <div class="param">id (optional)</div><div class="param-desc"><span class="param-type"><a href="#UUID">UUID</a></span>  format: uuid</div>
+<div class="param">cab_number (optional)</div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span> Unique vehicle registration number. </div>
+<div class="param">cab_type (optional)</div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+<div class="param">no_of_seats (optional)</div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span>  </div>
+<div class="param">luggage_capacity (optional)</div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span>  </div>
+<div class="param">status (optional)</div><div class="param-desc"><span class="param-type"><a href="#CabStatus">CabStatus</a></span>  </div>
+<div class="param">driver_id (optional)</div><div class="param-desc"><span class="param-type"><a href="#UUID">UUID</a></span>  format: uuid</div>
+<div class="param">driver (optional)</div><div class="param-desc"><span class="param-type"><a href="#Driver">Driver</a></span>  </div>
+    </div>  <!-- field-items -->
+  </div>
+  <div class="model">
+    <h3><a name="CancelRideRequest"><code>CancelRideRequest</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'></div>
+    <div class="field-items">
+      <div class="param">user_id </div><div class="param-desc"><span class="param-type"><a href="#UUID">UUID</a></span> ID of the user requesting cancellation. format: uuid</div>
+<div class="param">trip_id </div><div class="param-desc"><span class="param-type"><a href="#UUID">UUID</a></span> ID of the trip to cancel from. format: uuid</div>
+    </div>  <!-- field-items -->
+  </div>
+  <div class="model">
+    <h3><a name="CancelRideResponse"><code>CancelRideResponse</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'></div>
+    <div class="field-items">
+      <div class="param">message </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span> Human-readable outcome message. </div>
+<div class="param">trip_id </div><div class="param-desc"><span class="param-type"><a href="#UUID">UUID</a></span>  format: uuid</div>
+<div class="param">scenario </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span> <p>Describes what happened to the trip:</p>
+<ul>
+<li><code>SOLO_CANCELLATION</code> — The only rider cancelled; trip is terminated.</li>
+<li><code>TRIP_CANCELLED</code> — Second-to-last rider cancelled; trip is non-viable.</li>
+<li><code>RIDER_REMOVED</code> — Rider left a 3+ person trip; trip continues.</li>
+</ul>
+ </div>
+        <div class="param-enum-header">Enum:</div>
+        <div class="param-enum">SOLO_CANCELLATION</div><div class="param-enum">TRIP_CANCELLED</div><div class="param-enum">RIDER_REMOVED</div>
+<div class="param">notified_user (optional)</div><div class="param-desc"><span class="param-type"><a href="#UUID">UUID</a></span> (Scenario <code>TRIP_CANCELLED</code> only) The remaining user who was notified. format: uuid</div>
+<div class="param">remaining_riders (optional)</div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span> (Scenario <code>RIDER_REMOVED</code> only) Number of riders still in the trip. </div>
+<div class="param">notified_users (optional)</div><div class="param-desc"><span class="param-type"><a href="#UUID">array[UUID]</a></span> (Scenario <code>RIDER_REMOVED</code> only) User IDs that were notified of the departure. format: uuid</div>
+    </div>  <!-- field-items -->
+  </div>
+  <div class="model">
+    <h3><a name="Driver"><code>Driver</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'>A registered cab driver.</div>
+    <div class="field-items">
+      <div class="param">id (optional)</div><div class="param-desc"><span class="param-type"><a href="#UUID">UUID</a></span>  format: uuid</div>
+<div class="param">name (optional)</div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+<div class="param">email (optional)</div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  format: email</div>
+<div class="param">gender (optional)</div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+<div class="param">age (optional)</div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span>  </div>
+<div class="param">createdAt (optional)</div><div class="param-desc"><span class="param-type"><a href="#DateTime">Date</a></span>  format: date-time</div>
+    </div>  <!-- field-items -->
+  </div>
+  <div class="model">
+    <h3><a name="DriverSignupRequest"><code>DriverSignupRequest</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'></div>
+    <div class="field-items">
+      <div class="param">name </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span> Full name of the driver. </div>
+<div class="param">email </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span> Email address (must be unique). format: email</div>
+<div class="param">password </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span> Account password. format: password</div>
+<div class="param">gender </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span> Gender of the driver. </div>
+<div class="param">age </div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span> Age of the driver. </div>
+    </div>  <!-- field-items -->
+  </div>
+  <div class="model">
+    <h3><a name="DriverSignupResponse"><code>DriverSignupResponse</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'></div>
+    <div class="field-items">
+      <div class="param">message </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+<div class="param">driver </div><div class="param-desc"><span class="param-type"><a href="#Driver">Driver</a></span>  </div>
+    </div>  <!-- field-items -->
+  </div>
+  <div class="model">
+    <h3><a name="ErrorResponse"><code>ErrorResponse</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'></div>
+    <div class="field-items">
+      <div class="param">error </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span> A human-readable error message. </div>
+    </div>  <!-- field-items -->
+  </div>
+  <div class="model">
+    <h3><a name="GenerateOtpResponse"><code>GenerateOtpResponse</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'></div>
+    <div class="field-items">
+      <div class="param">message </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span> Success message. </div>
+<div class="param">trip_id </div><div class="param-desc"><span class="param-type"><a href="#UUID">UUID</a></span> ID of the trip for which OTPs were generated. format: uuid</div>
+<div class="param">otp_expiry </div><div class="param-desc"><span class="param-type"><a href="#DateTime">Date</a></span> ISO 8601 timestamp when all generated OTPs expire. format: date-time</div>
+    </div>  <!-- field-items -->
+  </div>
+  <div class="model">
+    <h3><a name="HealthCheckResponse"><code>HealthCheckResponse</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'></div>
+    <div class="field-items">
+      <div class="param">status </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span> Server status indicator. </div>
+        <div class="param-enum-header">Enum:</div>
+        <div class="param-enum">ok</div>
+<div class="param">workers </div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span> Number of active worker threads for ride matching. </div>
+<div class="param">pendingTasks </div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span> Number of ride-matching tasks queued for worker threads. </div>
+    </div>  <!-- field-items -->
+  </div>
+  <div class="model">
+    <h3><a name="OtpVerificationEntry"><code>OtpVerificationEntry</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'></div>
+    <div class="field-items">
+      <div class="param">user_id </div><div class="param-desc"><span class="param-type"><a href="#UUID">UUID</a></span> ID of the user whose OTP is being verified. format: uuid</div>
+<div class="param">otp </div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span> The 6-digit OTP to verify. </div>
+    </div>  <!-- field-items -->
+  </div>
+  <div class="model">
+    <h3><a name="OtpVerificationFailedResponse"><code>OtpVerificationFailedResponse</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'></div>
+    <div class="field-items">
+      <div class="param">error </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+<div class="param">failed </div><div class="param-desc"><span class="param-type"><a href="#OtpVerificationFailedResponse_failed_inner">array[OtpVerificationFailedResponse_failed_inner]</a></span>  </div>
+    </div>  <!-- field-items -->
+  </div>
+  <div class="model">
+    <h3><a name="OtpVerificationFailedResponse_failed_inner"><code>OtpVerificationFailedResponse_failed_inner</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'></div>
+    <div class="field-items">
+      <div class="param">user_id </div><div class="param-desc"><span class="param-type"><a href="#UUID">UUID</a></span>  format: uuid</div>
+<div class="param">reason </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span> Reason for failure (e.g., Invalid OTP, OTP has expired, User not found). </div>
+    </div>  <!-- field-items -->
+  </div>
+  <div class="model">
+    <h3><a name="RideRequest"><code>RideRequest</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'>An individual user's ride request within a trip.</div>
+    <div class="field-items">
+      <div class="param">id (optional)</div><div class="param-desc"><span class="param-type"><a href="#UUID">UUID</a></span>  format: uuid</div>
+<div class="param">status (optional)</div><div class="param-desc"><span class="param-type"><a href="#RideRequestStatus">RideRequestStatus</a></span>  </div>
+<div class="param">no_of_passengers (optional)</div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span>  </div>
+<div class="param">luggage_capacity (optional)</div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span>  </div>
+<div class="param">issued_price (optional)</div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span>  </div>
+<div class="param">joined_at (optional)</div><div class="param-desc"><span class="param-type"><a href="#DateTime">Date</a></span>  format: date-time</div>
+<div class="param">user_id (optional)</div><div class="param-desc"><span class="param-type"><a href="#UUID">UUID</a></span>  format: uuid</div>
+<div class="param">trip_id (optional)</div><div class="param-desc"><span class="param-type"><a href="#UUID">UUID</a></span>  format: uuid</div>
+    </div>  <!-- field-items -->
+  </div>
+  <div class="model">
+    <h3><a name="RideRequestStatus"><code>RideRequestStatus</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'><p>Status of an individual rider's participation:</p>
+<ul>
+<li><code>WAITING</code> — Awaiting ride start.</li>
+<li><code>ACTIVE</code> — Currently on the ride.</li>
+<li><code>COMPLETED</code> — Ride completed.</li>
+<li><code>CANCELLED</code> — User cancelled or was removed.</li>
+</ul>
+</div>
+    <div class="field-items">
+          </div>  <!-- field-items -->
+  </div>
+  <div class="model">
+    <h3><a name="RideRequestWithTrip"><code>RideRequestWithTrip</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'>A ride request record with its parent trip fully expanded.</div>
+    <div class="field-items">
+      <div class="param">id (optional)</div><div class="param-desc"><span class="param-type"><a href="#UUID">UUID</a></span>  format: uuid</div>
+<div class="param">status (optional)</div><div class="param-desc"><span class="param-type"><a href="#RideRequestStatus">RideRequestStatus</a></span>  </div>
+<div class="param">no_of_passengers (optional)</div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span>  </div>
+<div class="param">luggage_capacity (optional)</div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span>  </div>
+<div class="param">issued_price (optional)</div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span> Calculated fare for this rider (in ₹). Discounted by 70% if matched. </div>
+<div class="param">joined_at (optional)</div><div class="param-desc"><span class="param-type"><a href="#DateTime">Date</a></span>  format: date-time</div>
+<div class="param">user_id (optional)</div><div class="param-desc"><span class="param-type"><a href="#UUID">UUID</a></span>  format: uuid</div>
+<div class="param">trip_id (optional)</div><div class="param-desc"><span class="param-type"><a href="#UUID">UUID</a></span>  format: uuid</div>
+<div class="param">trip (optional)</div><div class="param-desc"><span class="param-type"><a href="#TripWithDetails">TripWithDetails</a></span>  </div>
+    </div>  <!-- field-items -->
+  </div>
+  <div class="model">
+    <h3><a name="RideRequestWithUser"><code>RideRequestWithUser</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'>A ride request with a summary of the rider's profile.</div>
+    <div class="field-items">
+      <div class="param">id (optional)</div><div class="param-desc"><span class="param-type"><a href="#UUID">UUID</a></span>  format: uuid</div>
+<div class="param">status (optional)</div><div class="param-desc"><span class="param-type"><a href="#RideRequestStatus">RideRequestStatus</a></span>  </div>
+<div class="param">no_of_passengers (optional)</div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span>  </div>
+<div class="param">luggage_capacity (optional)</div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span>  </div>
+<div class="param">issued_price (optional)</div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span>  </div>
+<div class="param">joined_at (optional)</div><div class="param-desc"><span class="param-type"><a href="#DateTime">Date</a></span>  format: date-time</div>
+<div class="param">user_id (optional)</div><div class="param-desc"><span class="param-type"><a href="#UUID">UUID</a></span>  format: uuid</div>
+<div class="param">trip_id (optional)</div><div class="param-desc"><span class="param-type"><a href="#UUID">UUID</a></span>  format: uuid</div>
+<div class="param">user (optional)</div><div class="param-desc"><span class="param-type"><a href="#RideRequestWithUser_user">RideRequestWithUser_user</a></span>  </div>
+    </div>  <!-- field-items -->
+  </div>
+  <div class="model">
+    <h3><a name="RideRequestWithUser_user"><code>RideRequestWithUser_user</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'></div>
+    <div class="field-items">
+      <div class="param">name (optional)</div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+<div class="param">age (optional)</div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span>  </div>
+<div class="param">gender (optional)</div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+    </div>  <!-- field-items -->
+  </div>
+  <div class="model">
+    <h3><a name="StartRideRequest"><code>StartRideRequest</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'></div>
+    <div class="field-items">
+      <div class="param">trip_id </div><div class="param-desc"><span class="param-type"><a href="#UUID">UUID</a></span> ID of the trip to start. format: uuid</div>
+<div class="param">verifications </div><div class="param-desc"><span class="param-type"><a href="#OtpVerificationEntry">array[OtpVerificationEntry]</a></span> OTP verification for each user in the trip. </div>
+    </div>  <!-- field-items -->
+  </div>
+  <div class="model">
+    <h3><a name="StartRideResponse"><code>StartRideResponse</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'></div>
+    <div class="field-items">
+      <div class="param">message </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+<div class="param">trip_id </div><div class="param-desc"><span class="param-type"><a href="#UUID">UUID</a></span>  format: uuid</div>
+<div class="param">status </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+        <div class="param-enum-header">Enum:</div>
+        <div class="param-enum">ACTIVE</div>
+<div class="param">activated_users </div><div class="param-desc"><span class="param-type"><a href="#UUID">array[UUID]</a></span> List of user IDs that were activated. format: uuid</div>
+<div class="param">activated_ride_requests </div><div class="param-desc"><span class="param-type"><a href="#UUID">array[UUID]</a></span> List of ride request IDs that were activated. format: uuid</div>
+    </div>  <!-- field-items -->
+  </div>
+  <div class="model">
+    <h3><a name="Trip"><code>Trip</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'>A shared ride trip.</div>
+    <div class="field-items">
+      <div class="param">id (optional)</div><div class="param-desc"><span class="param-type"><a href="#UUID">UUID</a></span>  format: uuid</div>
+<div class="param">status (optional)</div><div class="param-desc"><span class="param-type"><a href="#TripStatus">TripStatus</a></span>  </div>
+<div class="param">fare_each (optional)</div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span>  </div>
+<div class="param">no_of_passengers (optional)</div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span>  </div>
+<div class="param">total_luggage (optional)</div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span>  </div>
+<div class="param">created_at (optional)</div><div class="param-desc"><span class="param-type"><a href="#DateTime">Date</a></span>  format: date-time</div>
+<div class="param">cab_id (optional)</div><div class="param-desc"><span class="param-type"><a href="#UUID">UUID</a></span>  format: uuid</div>
+    </div>  <!-- field-items -->
+  </div>
+  <div class="model">
+    <h3><a name="TripStatus"><code>TripStatus</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'><p>Lifecycle status of a trip:</p>
+<ul>
+<li><code>WAITING</code> — Trip is formed and waiting for OTP verification / more riders.</li>
+<li><code>ACTIVE</code> — All OTPs verified; ride is in progress.</li>
+<li><code>COMPLETED</code> — Ride has been completed.</li>
+<li><code>CANCELLED</code> — Trip was cancelled before starting.</li>
+</ul>
+</div>
+    <div class="field-items">
+          </div>  <!-- field-items -->
+  </div>
+  <div class="model">
+    <h3><a name="TripWithDetails"><code>TripWithDetails</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'>A trip with its cab, driver, and all participating riders.</div>
+    <div class="field-items">
+      <div class="param">id (optional)</div><div class="param-desc"><span class="param-type"><a href="#UUID">UUID</a></span>  format: uuid</div>
+<div class="param">status (optional)</div><div class="param-desc"><span class="param-type"><a href="#TripStatus">TripStatus</a></span>  </div>
+<div class="param">fare_each (optional)</div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span> Base fare per rider (in ₹). </div>
+<div class="param">no_of_passengers (optional)</div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span> Total passengers across all ride requests in this trip. </div>
+<div class="param">total_luggage (optional)</div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span> Total luggage items across all ride requests in this trip. </div>
+<div class="param">created_at (optional)</div><div class="param-desc"><span class="param-type"><a href="#DateTime">Date</a></span>  format: date-time</div>
+<div class="param">cab_id (optional)</div><div class="param-desc"><span class="param-type"><a href="#UUID">UUID</a></span> May be null if no cab has been assigned yet. format: uuid</div>
+<div class="param">cab (optional)</div><div class="param-desc"><span class="param-type"><a href="#CabWithDriver">CabWithDriver</a></span>  </div>
+<div class="param">rideRequests (optional)</div><div class="param-desc"><span class="param-type"><a href="#RideRequestWithUser">array[RideRequestWithUser]</a></span>  </div>
+    </div>  <!-- field-items -->
+  </div>
+  <div class="model">
+    <h3><a name="User"><code>User</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'>A registered passenger.</div>
+    <div class="field-items">
+      <div class="param">id (optional)</div><div class="param-desc"><span class="param-type"><a href="#UUID">UUID</a></span>  format: uuid</div>
+<div class="param">name (optional)</div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+<div class="param">email (optional)</div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  format: email</div>
+<div class="param">gender (optional)</div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+<div class="param">age (optional)</div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span>  </div>
+<div class="param">createdAt (optional)</div><div class="param-desc"><span class="param-type"><a href="#DateTime">Date</a></span>  format: date-time</div>
+<div class="param">ride_otp (optional)</div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span> Current 6-digit OTP (null when no OTP is active). </div>
+<div class="param">otp_expiry (optional)</div><div class="param-desc"><span class="param-type"><a href="#DateTime">Date</a></span> When the current OTP expires (null when no OTP is active). format: date-time</div>
+    </div>  <!-- field-items -->
+  </div>
+  <div class="model">
+    <h3><a name="UserSignupRequest"><code>UserSignupRequest</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'></div>
+    <div class="field-items">
+      <div class="param">name </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span> Full name of the user. </div>
+<div class="param">email </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span> Email address (must be unique). format: email</div>
+<div class="param">password </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span> Account password. format: password</div>
+<div class="param">gender </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span> Gender of the user. </div>
+<div class="param">age </div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span> Age of the user. </div>
+    </div>  <!-- field-items -->
+  </div>
+  <div class="model">
+    <h3><a name="UserSignupResponse"><code>UserSignupResponse</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'></div>
+    <div class="field-items">
+      <div class="param">message </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+<div class="param">user </div><div class="param-desc"><span class="param-type"><a href="#User">User</a></span>  </div>
+    </div>  <!-- field-items -->
+  </div>
+  <div class="model">
+    <h3><a name="UserTripsResponse"><code>UserTripsResponse</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'></div>
+    <div class="field-items">
+      <div class="param">trips </div><div class="param-desc"><span class="param-type"><a href="#RideRequestWithTrip">array[RideRequestWithTrip]</a></span> All ride requests for the user, each including full trip details. </div>
+    </div>  <!-- field-items -->
+  </div>
+  <div class="model">
+    <h3><a name="generateOtp_request"><code>generateOtp_request</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'></div>
+    <div class="field-items">
+      <div class="param">trip_id </div><div class="param-desc"><span class="param-type"><a href="#UUID">UUID</a></span> The unique identifier of the trip. format: uuid</div>
+    </div>  <!-- field-items -->
+  </div>
+  <div class="model">
+    <h3><a name="getOtp_200_response"><code>getOtp_200_response</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'></div>
+    <div class="field-items">
+      <div class="param">otp </div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span> The 6-digit OTP. </div>
+    </div>  <!-- field-items -->
+  </div>
+  <div class="model">
+    <h3><a name="getOtp_request"><code>getOtp_request</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'></div>
+    <div class="field-items">
+      <div class="param">user_id </div><div class="param-desc"><span class="param-type"><a href="#UUID">UUID</a></span> The unique identifier of the user. format: uuid</div>
+    </div>  <!-- field-items -->
+  </div>
+  <div class="model">
+    <h3><a name="getUserTrips_request"><code>getUserTrips_request</code> - </a> <a class="up" href="#__Models">Up</a></h3>
+    <div class='model-description'></div>
+    <div class="field-items">
+      <div class="param">user_id </div><div class="param-desc"><span class="param-type"><a href="#UUID">UUID</a></span> The unique identifier of the user whose trips to fetch. format: uuid</div>
+    </div>  <!-- field-items -->
+  </div>
+  </body>
+</html>

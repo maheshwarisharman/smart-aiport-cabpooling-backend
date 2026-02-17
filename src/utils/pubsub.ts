@@ -14,8 +14,8 @@ export class RedisPubSubService {
     private readonly CHANNEL_PREFIX = 'ride:match:';
 
     private constructor() {
-        this.publisher = createClient({ url: 'redis://localhost:6379' });
-        this.subscriber = createClient({ url: 'redis://localhost:6379' });
+        this.publisher = createClient({ url: process.env.REDIS_URL || 'redis://localhost:6379' });
+        this.subscriber = createClient({ url: process.env.REDIS_URL || 'redis://localhost:6379' });
 
         this.publisher.on('error', (err) => console.error('Redis PubSub Publisher Error:', err));
         this.subscriber.on('error', (err) => console.error('Redis PubSub Subscriber Error:', err));

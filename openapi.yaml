@@ -1,0 +1,1412 @@
+openapi: 3.1.0
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  Smart Airport Cab Pooling — OpenAPI Specification
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+info:
+  title: Smart Airport Cab Pooling API
+  version: 1.0.0
+  description: |
+    ## Overview
+
+    The **Smart Airport Cab Pooling API** powers a ride-sharing platform tailored
+    for airport commuters. It matches passengers heading in similar directions,
+    pools them into shared cabs, and applies a **70 % discount** on each rider's
+    fare when a match is found.
+
+    ### Core Workflow
+
+    1. **Sign Up** — Passengers, drivers, and cabs are registered via the
+       `/signup` endpoints.
+    2. **Find a Ride** — A passenger connects through a WebSocket and sends
+       their ride details. The server attempts real-time matching using H3
+       geospatial indexing and Redis-backed pools.
+    3. **Generate OTP** — Once a trip is formed, an OTP is sent to every
+       participant.
+    4. **Start the Ride** — The driver verifies all OTPs, and the trip
+       transitions to `ACTIVE`.
+    5. **Cancel** — Any participant may cancel before the ride starts,
+       triggering automatic notifications & trip adjustments.
+
+    ### Transport Protocols
+
+    | Protocol  | Port  | Purpose                                          |
+    |-----------|-------|--------------------------------------------------|
+    | HTTP/REST | 3000  | CRUD operations, OTP flows, trip queries          |
+    | WebSocket | 3001  | Real-time ride matching & live notifications      |
+
+    ### Technology Stack
+
+    - **Runtime:** Bun
+    - **Framework:** Express 5
+    - **Database:** PostgreSQL (via Prisma ORM)
+    - **Caching / Matching Pool:** Redis (Sorted Sets + Pub/Sub)
+    - **Geospatial:** H3 hexagonal indexing
+    - **Concurrency:** Bun Worker Threads for CPU-intensive matching
+
+  contact:
+    name: Smart Airport Cab Pooling Team
+    email: support@smartcabpool.example.com
+  license:
+    name: MIT
+    identifier: MIT
+
+servers:
+  - url: http://localhost:3000
+    description: Local development — HTTP / REST API
+  - url: ws://localhost:3001
+    description: Local development — WebSocket server
+
+tags:
+  - name: Health
+    description: Server health & status checks
+  - name: Signup
+    description: User, driver, and cab registration
+  - name: Rides
+    description: Ride discovery and trip history
+  - name: Ride Lifecycle
+    description: OTP generation, ride start, and cancellation
+  - name: WebSocket
+    description: Real-time ride matching over WebSocket
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  PATHS
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+paths:
+
+  # ────────────────── Health ──────────────────
+
+  /:
+    get:
+      operationId: getHealthCheck
+      tags: [Health]
+      summary: Server health check
+      description: |
+        Returns the operational status of the server, including the number of
+        active worker threads and any pending ride-matching tasks.
+      responses:
+        "200":
+          description: Server is healthy.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthCheckResponse"
+              example:
+                status: ok
+                workers: 4
+                pendingTasks: 0
+
+  # ────────────────── Signup ──────────────────
+
+  /signup/user:
+    post:
+      operationId: signupUser
+      tags: [Signup]
+      summary: Register a new passenger
+      description: |
+        Creates a new passenger account. The user can then connect via WebSocket
+        to find and join shared rides.
+
+        > **Note:** Validation and authentication layers are not yet implemented.
+        > All fields are currently accepted as-is.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserSignupRequest"
+            example:
+              name: "Aarav Sharma"
+              email: "aarav@example.com"
+              password: "secureP@ssw0rd"
+              gender: "Male"
+              age: 28
+      responses:
+        "201":
+          description: User created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSignupResponse"
+              example:
+                message: "User created successfully"
+                user:
+                  id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                  name: "Aarav Sharma"
+                  email: "aarav@example.com"
+                  gender: "Male"
+                  age: 28
+                  createdAt: "2026-02-17T16:30:00.000Z"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /signup/driver:
+    post:
+      operationId: signupDriver
+      tags: [Signup]
+      summary: Register a new driver
+      description: |
+        Creates a new driver account. After signing up, a cab must be
+        registered separately via `POST /signup/cab` and linked to this
+        driver by `driver_id`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DriverSignupRequest"
+            example:
+              name: "Rajesh Kumar"
+              email: "rajesh@example.com"
+              password: "dr1verP@ss"
+              gender: "Male"
+              age: 35
+      responses:
+        "201":
+          description: Driver created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DriverSignupResponse"
+              example:
+                message: "Driver created successfully"
+                driver:
+                  id: "d1e2f3a4-b5c6-7890-abcd-ef9876543210"
+                  name: "Rajesh Kumar"
+                  email: "rajesh@example.com"
+                  gender: "Male"
+                  age: 35
+                  createdAt: "2026-02-17T16:35:00.000Z"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /signup/cab:
+    post:
+      operationId: signupCab
+      tags: [Signup]
+      summary: Register a cab linked to a driver
+      description: |
+        Adds a new cab to the fleet and associates it with an existing driver.
+        Each driver can have exactly **one** cab (1:1 relationship).
+
+        The cab's `status` defaults to `AVAILABLE`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CabSignupRequest"
+            example:
+              cab_number: "DL01AB1234"
+              cab_type: "Sedan"
+              no_of_seats: 4
+              luggage_capacity: 3
+              driver_id: "d1e2f3a4-b5c6-7890-abcd-ef9876543210"
+      responses:
+        "201":
+          description: Cab added successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CabSignupResponse"
+              example:
+                message: "Cab added successfully"
+                cab:
+                  id: "c1d2e3f4-a5b6-7890-abcd-123456789abc"
+                  cab_number: "DL01AB1234"
+                  cab_type: "Sedan"
+                  no_of_seats: 4
+                  luggage_capacity: 3
+                  status: "AVAILABLE"
+                  driver_id: "d1e2f3a4-b5c6-7890-abcd-ef9876543210"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ────────────────── Rides ──────────────────
+
+  /find-ride/trips:
+    post:
+      operationId: getUserTrips
+      tags: [Rides]
+      summary: Get all trips for a user
+      description: |
+        Retrieves every trip (and its nested data) that a specific user has
+        participated in. The response includes:
+
+        - **Trip** details (status, fare, passenger/luggage counts)
+        - **Assigned cab** and its **driver** information
+        - **All ride requests** within the trip, each with the rider's profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id]
+              properties:
+                user_id:
+                  type: string
+                  format: uuid
+                  description: The unique identifier of the user whose trips to fetch.
+            example:
+              user_id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+      responses:
+        "200":
+          description: Trips retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserTripsResponse"
+        "400":
+          description: Missing or invalid `user_id`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "user_id is required"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ────────────────── Ride Lifecycle ──────────────────
+
+  /ride/generate-otp:
+    post:
+      operationId: generateOtp
+      tags: [Ride Lifecycle]
+      summary: Generate OTPs for all users in a trip
+      description: |
+        Generates a unique **6-digit OTP** for every passenger associated with
+        the specified trip and stores it on each user's record in the database.
+
+        The OTP expires after **5 minutes**.
+
+        - Trip must be in `WAITING` status.
+        - Trip must have at least one ride request.
+
+        > **Dev Note:** In production, OTPs would be dispatched via SMS or push
+        > notification. This endpoint currently stores them in the DB only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [trip_id]
+              properties:
+                trip_id:
+                  type: string
+                  format: uuid
+                  description: The unique identifier of the trip.
+            example:
+              trip_id: "t1r2i3p4-a5b6-7890-abcd-trip12345678"
+      responses:
+        "200":
+          description: OTPs generated successfully for all users in the trip.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenerateOtpResponse"
+              example:
+                message: "OTPs generated successfully"
+                trip_id: "t1r2i3p4-a5b6-7890-abcd-trip12345678"
+                otp_expiry: "2026-02-17T17:05:00.000Z"
+        "400":
+          description: Missing or invalid `trip_id`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "trip_id is required and must be a string"
+        "404":
+          description: Trip not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Trip not found"
+        "409":
+          description: Trip is in a conflicting state (already active, completed, or cancelled).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                alreadyActive:
+                  summary: Trip is already active
+                  value:
+                    error: "Trip is already active"
+                alreadyCompleted:
+                  summary: Trip is already completed
+                  value:
+                    error: "Trip is already completed"
+        "422":
+          description: Trip has no ride requests / users.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Trip has no ride requests / users"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /ride/start:
+    post:
+      operationId: startRide
+      tags: [Ride Lifecycle]
+      summary: Verify OTPs and start the ride
+      description: |
+        Verifies the OTP of **every** user in the trip. If all verifications
+        pass:
+
+        1. OTP fields are cleared on each user record.
+        2. The trip status transitions to `ACTIVE`.
+        3. All associated ride requests transition to `ACTIVE`.
+
+        **All database writes are executed atomically** inside a single
+        Prisma transaction.
+
+        ### Failure Modes
+
+        - If **any** OTP is invalid, expired, or missing, the entire request
+          is rejected with details about which verifications failed.
+        - Verifications for users not belonging to the trip, or missing users
+          in the trip, are rejected.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartRideRequest"
+            example:
+              trip_id: "t1r2i3p4-a5b6-7890-abcd-trip12345678"
+              verifications:
+                - user_id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                  otp: 482913
+                - user_id: "f6e5d4c3-b2a1-0987-dcba-6543210fedcb"
+                  otp: 719205
+      responses:
+        "200":
+          description: All OTPs verified — ride is now active.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StartRideResponse"
+              example:
+                message: "Ride started successfully"
+                trip_id: "t1r2i3p4-a5b6-7890-abcd-trip12345678"
+                status: "ACTIVE"
+                activated_users:
+                  - "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                  - "f6e5d4c3-b2a1-0987-dcba-6543210fedcb"
+                activated_ride_requests:
+                  - "rr1a2b3c-d4e5-6789-abcd-rr1234567890"
+                  - "rr7f8e9d-c0b1-2345-abcd-rr0987654321"
+        "400":
+          description: Invalid or incomplete request payload.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                missingTripId:
+                  summary: Missing trip_id
+                  value:
+                    error: "trip_id is required and must be a string"
+                emptyVerifications:
+                  summary: Empty verifications array
+                  value:
+                    error: "verifications must be a non-empty array of { user_id, otp }"
+                duplicateUserId:
+                  summary: Duplicate user_id in verifications
+                  value:
+                    error: "Duplicate user_id entries found in verifications"
+                missingUsers:
+                  summary: Not all trip users are covered
+                  value:
+                    error: "OTP verification is missing for some users in this trip"
+                    missing_user_ids:
+                      - "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                extraUsers:
+                  summary: User does not belong to the trip
+                  value:
+                    error: "Some user_ids in verifications do not belong to this trip"
+                    extra_user_ids:
+                      - "z9y8x7w6-v5u4-3210-abcd-unknownuser00"
+        "401":
+          description: One or more OTP verifications failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OtpVerificationFailedResponse"
+              example:
+                error: "OTP verification failed for one or more users"
+                failed:
+                  - user_id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                    reason: "Invalid OTP"
+                  - user_id: "f6e5d4c3-b2a1-0987-dcba-6543210fedcb"
+                    reason: "OTP has expired"
+        "404":
+          description: Trip not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Trip not found"
+        "409":
+          description: Trip is in a conflicting state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                alreadyActive:
+                  summary: Trip is already active
+                  value:
+                    error: "Trip is already active"
+                alreadyCompleted:
+                  summary: Trip is already completed
+                  value:
+                    error: "Trip is already completed"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /ride/get-otp:
+    post:
+      operationId: getOtp
+      tags: [Ride Lifecycle]
+      summary: Retrieve the current OTP for a user
+      description: |
+        Returns the active OTP for a passenger. This is intended for the
+        client app to display the OTP so the user can show it to the driver.
+
+        - Returns `404` if no OTP has been generated.
+        - Returns `410 Gone` if the OTP has expired.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id]
+              properties:
+                user_id:
+                  type: string
+                  format: uuid
+                  description: The unique identifier of the user.
+            example:
+              user_id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+      responses:
+        "200":
+          description: OTP retrieved successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [otp]
+                properties:
+                  otp:
+                    type: integer
+                    description: The 6-digit OTP.
+                    example: 482913
+        "400":
+          description: Missing or invalid `user_id`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "user_id is required and must be a string"
+        "404":
+          description: User not found or no OTP generated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                userNotFound:
+                  summary: User does not exist
+                  value:
+                    error: "User not found"
+                noOtp:
+                  summary: No OTP has been generated
+                  value:
+                    error: "No OTP has been generated for this user"
+        "410":
+          description: OTP has expired.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "OTP has expired. Please request a new one."
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /cancel-ride/cancel:
+    post:
+      operationId: cancelRide
+      tags: [Ride Lifecycle]
+      summary: Cancel a user's participation in a trip
+      description: |
+        Removes a user from a trip. The outcome depends on how many riders
+        remain:
+
+        | Riders Before | Scenario             | Trip Status After | Notifications                              |
+        |---------------|----------------------|-------------------|--------------------------------------------|
+        | 1 (solo)      | `SOLO_CANCELLATION`  | `CANCELLED`       | None                                       |
+        | 2             | `TRIP_CANCELLED`     | `CANCELLED`       | Remaining rider notified via Pub/Sub       |
+        | 3 +           | `RIDER_REMOVED`      | `WAITING` (cont.) | All remaining riders notified via Pub/Sub  |
+
+        ### Guard Rails
+
+        - Cannot cancel an `ACTIVE`, `COMPLETED`, or already `CANCELLED` trip.
+        - The requesting user must belong to the trip.
+
+        ### Side Effects
+
+        - Redis pool entries for the cancelled user are cleaned up via worker
+          threads (non-blocking).
+        - If a 2-rider trip is cancelled and a cab was assigned, the cab status
+          is reset to `AVAILABLE`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancelRideRequest"
+            example:
+              user_id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+              trip_id: "t1r2i3p4-a5b6-7890-abcd-trip12345678"
+      responses:
+        "200":
+          description: Cancellation processed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CancelRideResponse"
+              examples:
+                solo:
+                  summary: Solo rider cancelled
+                  value:
+                    message: "Trip cancelled successfully"
+                    trip_id: "t1r2i3p4-a5b6-7890-abcd-trip12345678"
+                    scenario: "SOLO_CANCELLATION"
+                twoRiders:
+                  summary: 2-rider trip cancelled entirely
+                  value:
+                    message: "Trip cancelled — only one rider remained, trip is no longer viable"
+                    trip_id: "t1r2i3p4-a5b6-7890-abcd-trip12345678"
+                    scenario: "TRIP_CANCELLED"
+                    notified_user: "f6e5d4c3-b2a1-0987-dcba-6543210fedcb"
+                threeOrMore:
+                  summary: Rider removed from 3+ rider trip
+                  value:
+                    message: "Successfully left the trip"
+                    trip_id: "t1r2i3p4-a5b6-7890-abcd-trip12345678"
+                    scenario: "RIDER_REMOVED"
+                    remaining_riders: 2
+                    notified_users:
+                      - "f6e5d4c3-b2a1-0987-dcba-6543210fedcb"
+                      - "11223344-5566-7788-99aa-bbccddeeff00"
+        "400":
+          description: Missing or invalid input.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                missingUserId:
+                  summary: Missing user_id
+                  value:
+                    error: "user_id is required and must be a string"
+                missingTripId:
+                  summary: Missing trip_id
+                  value:
+                    error: "trip_id is required and must be a string"
+        "404":
+          description: Trip or user not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                tripNotFound:
+                  summary: Trip does not exist
+                  value:
+                    error: "Trip not found"
+                userNotInTrip:
+                  summary: User is not part of this trip
+                  value:
+                    error: "User is not part of this trip"
+        "409":
+          description: Trip is in a conflicting state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                alreadyActive:
+                  summary: Cannot cancel an active ride
+                  value:
+                    error: "Cannot cancel an active ride. The ride is already in progress."
+                alreadyCompleted:
+                  summary: Trip is already completed
+                  value:
+                    error: "Trip is already completed"
+                alreadyCancelled:
+                  summary: Trip is already cancelled
+                  value:
+                    error: "Trip is already cancelled"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  WebSocket Protocol Documentation (x-webhooks extension)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+x-webhooks:
+  WebSocket Connection:
+    description: |
+      ## WebSocket Ride Matching Protocol
+
+      **Endpoint:** `ws://localhost:3001/ws?userId=<uuid>`
+
+      The WebSocket server runs on **port 3001** and provides real-time ride
+      matching and notification delivery.
+
+      ### Connection Flow
+
+      ```
+      Client                           Server
+        │                                 │
+        ├── GET /ws?userId=<id> ─────────►│  (HTTP Upgrade)
+        │                                 │
+        │◄── CONNECTED ──────────────────┤  (status: EXISTING_TRIP or AWAITING_REGISTRATION)
+        │                                 │
+        ├── REGISTER_RIDE ───────────────►│  (client sends ride details)
+        │                                 │
+        │◄── REGISTERED / RIDE_MATCHED ──┤  (matching result)
+        │                                 │
+        │◄── RIDE_MATCHED ───────────────┤  (future match via Pub/Sub)
+        │◄── RIDE_CANCELLED ─────────────┤  (co-rider cancelled)
+        │◄── RIDER_LEFT ─────────────────┤  (co-rider left a 3+ trip)
+        │                                 │
+        ├── PING ────────────────────────►│
+        │◄── PONG ───────────────────────┤
+        │                                 │
+        ├── close ───────────────────────►│  (user removed from Redis pool)
+      ```
+
+      ### Query Parameters
+
+      | Param    | Type   | Required | Description                  |
+      |----------|--------|----------|------------------------------|
+      | `userId` | string | Yes      | UUID of the connecting user  |
+
+      ### Client → Server Messages
+
+      #### `REGISTER_RIDE`
+      Enters the user into the ride-matching pool.
+
+      ```json
+      {
+        "type": "REGISTER_RIDE",
+        "no_of_passengers": 2,
+        "luggage": 1,
+        "latitude": 28.5562,
+        "longitude": 77.1000
+      }
+      ```
+
+      | Field              | Type    | Required | Description                                    |
+      |--------------------|---------|----------|------------------------------------------------|
+      | `type`             | string  | Yes      | Must be `"REGISTER_RIDE"`                      |
+      | `no_of_passengers` | integer | Yes      | Number of passengers (including sender)        |
+      | `luggage`          | integer | Yes      | Number of luggage items                        |
+      | `latitude`         | number  | Yes      | Destination latitude (WGS 84)                  |
+      | `longitude`        | number  | Yes      | Destination longitude (WGS 84)                 |
+
+      #### `PING`
+      Heartbeat to keep the connection alive.
+
+      ```json
+      { "type": "PING" }
+      ```
+
+      ### Server → Client Messages
+
+      #### `CONNECTED`
+      Sent immediately after a successful WebSocket upgrade.
+
+      ```json
+      {
+        "type": "CONNECTED",
+        "status": "AWAITING_REGISTRATION",
+        "message": "Connected. Send a REGISTER_RIDE message with your ride details to enter the matching pool."
+      }
+      ```
+
+      `status` can be:
+      - `AWAITING_REGISTRATION` — User has no pending trip; must send `REGISTER_RIDE`.
+      - `EXISTING_TRIP` — User is already part of a waiting trip (includes `trip_id`).
+
+      #### `REGISTERED`
+      Sent when the user has been added to the pool but no immediate match was found.
+
+      ```json
+      {
+        "type": "REGISTERED",
+        "message": "You are now in the matching pool. Waiting for a ride match..."
+      }
+      ```
+
+      #### `RIDE_MATCHED`
+      Sent when a match is found (either immediately or later via Pub/Sub).
+
+      ```json
+      {
+        "type": "RIDE_MATCHED",
+        "match_type": "DIRECT",
+        "user_id": "matched-user-uuid",
+        "trip_id": "new-trip-uuid",
+        "trip": { ... }
+      }
+      ```
+
+      `match_type` values:
+      | Value          | Description                                               |
+      |----------------|-----------------------------------------------------------|
+      | `DIRECT`       | Exact H3 cell match — same destination                    |
+      | `BEST_DETOUR`  | H3 neighbour match — destinations are close               |
+      | `NEIGHBOUR`    | H3 neighbour match variant                                |
+
+      #### `RIDE_CANCELLED`
+      Pub/Sub notification when a co-rider cancels and the trip becomes non-viable.
+
+      ```json
+      {
+        "type": "RIDE_CANCELLED",
+        "message": "Your co-rider has cancelled. The trip has been cancelled.",
+        "trip_id": "trip-uuid",
+        "cancelled_by": "user-uuid"
+      }
+      ```
+
+      #### `RIDER_LEFT`
+      Pub/Sub notification when a co-rider leaves a 3+ person trip.
+
+      ```json
+      {
+        "type": "RIDER_LEFT",
+        "message": "A co-rider has left the trip.",
+        "trip_id": "trip-uuid",
+        "cancelled_user_id": "user-uuid",
+        "updated_trip": { ... }
+      }
+      ```
+
+      #### `PONG`
+      Response to a `PING` message.
+
+      ```json
+      { "type": "PONG", "timestamp": 1739816400000 }
+      ```
+
+      #### `ERROR`
+      Sent when a client message fails validation or processing.
+
+      ```json
+      {
+        "type": "ERROR",
+        "message": "REGISTER_RIDE requires: no_of_passengers, luggage, latitude, longitude"
+      }
+      ```
+
+      ### Connection Closure
+
+      When a WebSocket connection is closed, the server automatically:
+      1. Removes the user from the Redis matching pool (via worker thread).
+      2. Unsubscribes the user from the Pub/Sub channel.
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  COMPONENTS
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+components:
+
+  # ────────────── Reusable Responses ──────────────
+
+  responses:
+    InternalServerError:
+      description: An unexpected error occurred on the server.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: "Internal Server Error"
+
+  # ────────────── Schemas ──────────────
+
+  schemas:
+
+    # ── Generic ──
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: A human-readable error message.
+      example:
+        error: "An error occurred"
+
+    # ── Health ──
+
+    HealthCheckResponse:
+      type: object
+      required: [status, workers, pendingTasks]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+          description: Server status indicator.
+        workers:
+          type: integer
+          description: Number of active worker threads for ride matching.
+        pendingTasks:
+          type: integer
+          description: Number of ride-matching tasks queued for worker threads.
+
+    # ── Signup ──
+
+    UserSignupRequest:
+      type: object
+      required: [name, email, password, gender, age]
+      properties:
+        name:
+          type: string
+          description: Full name of the user.
+          example: "Aarav Sharma"
+        email:
+          type: string
+          format: email
+          description: Email address (must be unique).
+          example: "aarav@example.com"
+        password:
+          type: string
+          format: password
+          description: Account password.
+          example: "secureP@ssw0rd"
+        gender:
+          type: string
+          description: Gender of the user.
+          example: "Male"
+        age:
+          type: integer
+          minimum: 1
+          description: Age of the user.
+          example: 28
+
+    UserSignupResponse:
+      type: object
+      required: [message, user]
+      properties:
+        message:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+
+    DriverSignupRequest:
+      type: object
+      required: [name, email, password, gender, age]
+      properties:
+        name:
+          type: string
+          description: Full name of the driver.
+          example: "Rajesh Kumar"
+        email:
+          type: string
+          format: email
+          description: Email address (must be unique).
+          example: "rajesh@example.com"
+        password:
+          type: string
+          format: password
+          description: Account password.
+          example: "dr1verP@ss"
+        gender:
+          type: string
+          description: Gender of the driver.
+          example: "Male"
+        age:
+          type: integer
+          minimum: 1
+          description: Age of the driver.
+          example: 35
+
+    DriverSignupResponse:
+      type: object
+      required: [message, driver]
+      properties:
+        message:
+          type: string
+        driver:
+          $ref: "#/components/schemas/Driver"
+
+    CabSignupRequest:
+      type: object
+      required: [cab_number, cab_type, no_of_seats, luggage_capacity, driver_id]
+      properties:
+        cab_number:
+          type: string
+          description: Unique registration number of the cab.
+          example: "DL01AB1234"
+        cab_type:
+          type: string
+          description: "Type/category of the vehicle (e.g., Sedan, SUV, Hatchback)."
+          example: "Sedan"
+        no_of_seats:
+          type: integer
+          minimum: 1
+          description: Total passenger seating capacity.
+          example: 4
+        luggage_capacity:
+          type: integer
+          minimum: 0
+          description: Maximum number of luggage items the cab can hold.
+          example: 3
+        driver_id:
+          type: string
+          format: uuid
+          description: UUID of the driver this cab belongs to. Each driver can own exactly one cab.
+          example: "d1e2f3a4-b5c6-7890-abcd-ef9876543210"
+
+    CabSignupResponse:
+      type: object
+      required: [message, cab]
+      properties:
+        message:
+          type: string
+        cab:
+          $ref: "#/components/schemas/Cab"
+
+    # ── Ride / OTP ──
+
+    GenerateOtpResponse:
+      type: object
+      required: [message, trip_id, otp_expiry]
+      properties:
+        message:
+          type: string
+          description: Success message.
+        trip_id:
+          type: string
+          format: uuid
+          description: ID of the trip for which OTPs were generated.
+        otp_expiry:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp when all generated OTPs expire.
+
+    StartRideRequest:
+      type: object
+      required: [trip_id, verifications]
+      properties:
+        trip_id:
+          type: string
+          format: uuid
+          description: ID of the trip to start.
+        verifications:
+          type: array
+          minItems: 1
+          description: OTP verification for each user in the trip.
+          items:
+            $ref: "#/components/schemas/OtpVerificationEntry"
+
+    OtpVerificationEntry:
+      type: object
+      required: [user_id, otp]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+          description: ID of the user whose OTP is being verified.
+        otp:
+          type: integer
+          description: The 6-digit OTP to verify.
+          example: 482913
+
+    StartRideResponse:
+      type: object
+      required: [message, trip_id, status, activated_users, activated_ride_requests]
+      properties:
+        message:
+          type: string
+        trip_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [ACTIVE]
+        activated_users:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: List of user IDs that were activated.
+        activated_ride_requests:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: List of ride request IDs that were activated.
+
+    OtpVerificationFailedResponse:
+      type: object
+      required: [error, failed]
+      properties:
+        error:
+          type: string
+        failed:
+          type: array
+          items:
+            type: object
+            required: [user_id, reason]
+            properties:
+              user_id:
+                type: string
+                format: uuid
+              reason:
+                type: string
+                description: "Reason for failure (e.g., Invalid OTP, OTP has expired, User not found)."
+
+    # ── Cancel ──
+
+    CancelRideRequest:
+      type: object
+      required: [user_id, trip_id]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+          description: ID of the user requesting cancellation.
+        trip_id:
+          type: string
+          format: uuid
+          description: ID of the trip to cancel from.
+
+    CancelRideResponse:
+      type: object
+      required: [message, trip_id, scenario]
+      properties:
+        message:
+          type: string
+          description: Human-readable outcome message.
+        trip_id:
+          type: string
+          format: uuid
+        scenario:
+          type: string
+          enum: [SOLO_CANCELLATION, TRIP_CANCELLED, RIDER_REMOVED]
+          description: |
+            Describes what happened to the trip:
+            - `SOLO_CANCELLATION` — The only rider cancelled; trip is terminated.
+            - `TRIP_CANCELLED` — Second-to-last rider cancelled; trip is non-viable.
+            - `RIDER_REMOVED` — Rider left a 3+ person trip; trip continues.
+        notified_user:
+          type: string
+          format: uuid
+          description: (Scenario `TRIP_CANCELLED` only) The remaining user who was notified.
+        remaining_riders:
+          type: integer
+          description: (Scenario `RIDER_REMOVED` only) Number of riders still in the trip.
+        notified_users:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: (Scenario `RIDER_REMOVED` only) User IDs that were notified of the departure.
+
+    # ── Trips ──
+
+    UserTripsResponse:
+      type: object
+      required: [trips]
+      properties:
+        trips:
+          type: array
+          description: All ride requests for the user, each including full trip details.
+          items:
+            $ref: "#/components/schemas/RideRequestWithTrip"
+
+    RideRequestWithTrip:
+      type: object
+      description: A ride request record with its parent trip fully expanded.
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/RideRequestStatus"
+        no_of_passengers:
+          type: integer
+        luggage_capacity:
+          type: integer
+        issued_price:
+          type: integer
+          description: "Calculated fare for this rider (in ₹). Discounted by 70% if matched."
+        joined_at:
+          type: string
+          format: date-time
+        user_id:
+          type: string
+          format: uuid
+        trip_id:
+          type: string
+          format: uuid
+        trip:
+          $ref: "#/components/schemas/TripWithDetails"
+
+    TripWithDetails:
+      type: object
+      description: A trip with its cab, driver, and all participating riders.
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/TripStatus"
+        fare_each:
+          type: integer
+          description: "Base fare per rider (in ₹)."
+        no_of_passengers:
+          type: integer
+          description: Total passengers across all ride requests in this trip.
+        total_luggage:
+          type: integer
+          description: Total luggage items across all ride requests in this trip.
+        created_at:
+          type: string
+          format: date-time
+        cab_id:
+          type:
+            - string
+            - "null"
+          format: uuid
+          description: May be null if no cab has been assigned yet.
+        cab:
+          oneOf:
+            - $ref: "#/components/schemas/CabWithDriver"
+            - type: "null"
+        rideRequests:
+          type: array
+          items:
+            $ref: "#/components/schemas/RideRequestWithUser"
+
+    RideRequestWithUser:
+      type: object
+      description: A ride request with a summary of the rider's profile.
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/RideRequestStatus"
+        no_of_passengers:
+          type: integer
+        luggage_capacity:
+          type: integer
+        issued_price:
+          type: integer
+        joined_at:
+          type: string
+          format: date-time
+        user_id:
+          type: string
+          format: uuid
+        trip_id:
+          type: string
+          format: uuid
+        user:
+          type: object
+          properties:
+            name:
+              type: string
+            age:
+              type: integer
+            gender:
+              type: string
+
+    # ── Database Entity Schemas ──
+
+    User:
+      type: object
+      description: A registered passenger.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        gender:
+          type: string
+        age:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        ride_otp:
+          type:
+            - integer
+            - "null"
+          description: Current 6-digit OTP (null when no OTP is active).
+        otp_expiry:
+          type:
+            - string
+            - "null"
+          format: date-time
+          description: When the current OTP expires (null when no OTP is active).
+
+    Driver:
+      type: object
+      description: A registered cab driver.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        gender:
+          type: string
+        age:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    Cab:
+      type: object
+      description: A registered cab vehicle.
+      properties:
+        id:
+          type: string
+          format: uuid
+        cab_number:
+          type: string
+          description: Unique vehicle registration number.
+        cab_type:
+          type: string
+        no_of_seats:
+          type: integer
+        luggage_capacity:
+          type: integer
+        status:
+          $ref: "#/components/schemas/CabStatus"
+        driver_id:
+          type: string
+          format: uuid
+
+    CabWithDriver:
+      type: object
+      description: A cab with its associated driver profile.
+      allOf:
+        - $ref: "#/components/schemas/Cab"
+        - type: object
+          properties:
+            driver:
+              $ref: "#/components/schemas/Driver"
+
+    Trip:
+      type: object
+      description: A shared ride trip.
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/TripStatus"
+        fare_each:
+          type: integer
+        no_of_passengers:
+          type: integer
+        total_luggage:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        cab_id:
+          type:
+            - string
+            - "null"
+          format: uuid
+
+    RideRequest:
+      type: object
+      description: An individual user's ride request within a trip.
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/RideRequestStatus"
+        no_of_passengers:
+          type: integer
+        luggage_capacity:
+          type: integer
+        issued_price:
+          type: integer
+        joined_at:
+          type: string
+          format: date-time
+        user_id:
+          type: string
+          format: uuid
+        trip_id:
+          type: string
+          format: uuid
+
+    # ── Enumerations ──
+
+    TripStatus:
+      type: string
+      enum: [WAITING, ACTIVE, COMPLETED, CANCELLED]
+      description: |
+        Lifecycle status of a trip:
+        - `WAITING` — Trip is formed and waiting for OTP verification / more riders.
+        - `ACTIVE` — All OTPs verified; ride is in progress.
+        - `COMPLETED` — Ride has been completed.
+        - `CANCELLED` — Trip was cancelled before starting.
+
+    RideRequestStatus:
+      type: string
+      enum: [WAITING, ACTIVE, COMPLETED, CANCELLED]
+      description: |
+        Status of an individual rider's participation:
+        - `WAITING` — Awaiting ride start.
+        - `ACTIVE` — Currently on the ride.
+        - `COMPLETED` — Ride completed.
+        - `CANCELLED` — User cancelled or was removed.
+
+    CabStatus:
+      type: string
+      enum: [AVAILABLE, ASSIGNED, ON_TRIP]
+      description: |
+        Operational status of a cab:
+        - `AVAILABLE` — Cab is free and can be assigned to a trip.
+        - `ASSIGNED` — Cab has been assigned to a trip but the ride hasn't started.
+        - `ON_TRIP` — Cab is currently on an active ride.

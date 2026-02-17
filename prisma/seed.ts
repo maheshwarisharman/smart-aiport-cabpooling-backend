@@ -9,18 +9,18 @@ import { prisma } from '../lib/prisma'
 async function main() {
     console.log(' Seeding database...\n')
 
-    // ── Users ──
+    // ── Users (fixed IDs for easy testing) ──
     const users = [
-        { name: 'Aarav Sharma', email: 'aarav.sharma@gmail.com', password: 'hashed_password_1', gender: 'Male', age: 28 },
-        { name: 'Priya Patel', email: 'priya.patel@gmail.com', password: 'hashed_password_2', gender: 'Female', age: 25 },
-        { name: 'Rohan Gupta', email: 'rohan.gupta@gmail.com', password: 'hashed_password_3', gender: 'Male', age: 32 },
-        { name: 'Ananya Singh', email: 'ananya.singh@gmail.com', password: 'hashed_password_4', gender: 'Female', age: 22 },
-        { name: 'Vikram Reddy', email: 'vikram.reddy@gmail.com', password: 'hashed_password_5', gender: 'Male', age: 35 },
-        { name: 'Sneha Iyer', email: 'sneha.iyer@gmail.com', password: 'hashed_password_6', gender: 'Female', age: 29 },
-        { name: 'Arjun Mehta', email: 'arjun.mehta@gmail.com', password: 'hashed_password_7', gender: 'Male', age: 26 },
-        { name: 'Kavya Nair', email: 'kavya.nair@gmail.com', password: 'hashed_password_8', gender: 'Female', age: 24 },
-        { name: 'Rahul Verma', email: 'rahul.verma@gmail.com', password: 'hashed_password_9', gender: 'Male', age: 30 },
-        { name: 'Diya Choudhury', email: 'diya.choudhury@gmail.com', password: 'hashed_password_10', gender: 'Female', age: 27 },
+        { id: 'user-001', name: 'Aarav Sharma', email: 'aarav.sharma@gmail.com', password: 'hashed_password_1', gender: 'Male', age: 28 },
+        { id: 'user-002', name: 'Priya Patel', email: 'priya.patel@gmail.com', password: 'hashed_password_2', gender: 'Female', age: 25 },
+        { id: 'user-003', name: 'Rohan Gupta', email: 'rohan.gupta@gmail.com', password: 'hashed_password_3', gender: 'Male', age: 32 },
+        { id: 'user-004', name: 'Ananya Singh', email: 'ananya.singh@gmail.com', password: 'hashed_password_4', gender: 'Female', age: 22 },
+        { id: 'user-005', name: 'Vikram Reddy', email: 'vikram.reddy@gmail.com', password: 'hashed_password_5', gender: 'Male', age: 35 },
+        { id: 'user-006', name: 'Sneha Iyer', email: 'sneha.iyer@gmail.com', password: 'hashed_password_6', gender: 'Female', age: 29 },
+        { id: 'user-007', name: 'Arjun Mehta', email: 'arjun.mehta@gmail.com', password: 'hashed_password_7', gender: 'Male', age: 26 },
+        { id: 'user-008', name: 'Kavya Nair', email: 'kavya.nair@gmail.com', password: 'hashed_password_8', gender: 'Female', age: 24 },
+        { id: 'user-009', name: 'Rahul Verma', email: 'rahul.verma@gmail.com', password: 'hashed_password_9', gender: 'Male', age: 30 },
+        { id: 'user-010', name: 'Diya Choudhury', email: 'diya.choudhury@gmail.com', password: 'hashed_password_10', gender: 'Female', age: 27 },
     ]
 
     console.log('👤 Seeding users...')
@@ -33,13 +33,13 @@ async function main() {
         console.log(`   ✓ ${result.name} (${result.id})`)
     }
 
-    // ── Drivers ──
+    // ── Drivers (fixed IDs) ──
     const drivers = [
-        { name: 'Rajesh Kumar', email: 'rajesh.driver@gmail.com', password: 'hashed_driver_1', gender: 'Male', age: 40 },
-        { name: 'Suresh Yadav', email: 'suresh.driver@gmail.com', password: 'hashed_driver_2', gender: 'Male', age: 38 },
-        { name: 'Manoj Tiwari', email: 'manoj.driver@gmail.com', password: 'hashed_driver_3', gender: 'Male', age: 45 },
-        { name: 'Amit Chauhan', email: 'amit.driver@gmail.com', password: 'hashed_driver_4', gender: 'Male', age: 35 },
-        { name: 'Deepak Pandey', email: 'deepak.driver@gmail.com', password: 'hashed_driver_5', gender: 'Male', age: 42 },
+        { id: 'driver-001', name: 'Rajesh Kumar', email: 'rajesh.driver@gmail.com', password: 'hashed_driver_1', gender: 'Male', age: 40 },
+        { id: 'driver-002', name: 'Suresh Yadav', email: 'suresh.driver@gmail.com', password: 'hashed_driver_2', gender: 'Male', age: 38 },
+        { id: 'driver-003', name: 'Manoj Tiwari', email: 'manoj.driver@gmail.com', password: 'hashed_driver_3', gender: 'Male', age: 45 },
+        { id: 'driver-004', name: 'Amit Chauhan', email: 'amit.driver@gmail.com', password: 'hashed_driver_4', gender: 'Male', age: 35 },
+        { id: 'driver-005', name: 'Deepak Pandey', email: 'deepak.driver@gmail.com', password: 'hashed_driver_5', gender: 'Male', age: 42 },
     ]
 
     console.log('\n🚗 Seeding drivers...')
@@ -54,16 +54,16 @@ async function main() {
         console.log(`   ✓ ${result.name} (${result.id})`)
     }
 
-    // ── Cabs (one per driver) ──
+    // ── Cabs (fixed IDs, one per driver) ──
     const cabs = [
-        { cab_number: 'DL-01-AB-1234', cab_type: 'Sedan', no_of_seats: 3, luggage_capacity: 3, status: 'AVAILABLE' },
-        { cab_number: 'DL-02-CD-5678', cab_type: 'SUV', no_of_seats: 4, luggage_capacity: 5, status: 'AVAILABLE' },
-        { cab_number: 'DL-03-EF-9012', cab_type: 'Sedan', no_of_seats: 3, luggage_capacity: 3, status: 'AVAILABLE' },
-        { cab_number: 'DL-04-GH-3456', cab_type: 'Mini Van', no_of_seats: 6, luggage_capacity: 8, status: 'AVAILABLE' },
-        { cab_number: 'DL-05-IJ-7890', cab_type: 'Hatchback', no_of_seats: 2, luggage_capacity: 2, status: 'AVAILABLE' },
+        { id: 'cab-001', cab_number: 'DL-01-AB-1234', cab_type: 'Sedan', no_of_seats: 3, luggage_capacity: 3, status: 'AVAILABLE' },
+        { id: 'cab-002', cab_number: 'DL-02-CD-5678', cab_type: 'SUV', no_of_seats: 4, luggage_capacity: 5, status: 'AVAILABLE' },
+        { id: 'cab-003', cab_number: 'DL-03-EF-9012', cab_type: 'Sedan', no_of_seats: 3, luggage_capacity: 3, status: 'AVAILABLE' },
+        { id: 'cab-004', cab_number: 'DL-04-GH-3456', cab_type: 'Mini Van', no_of_seats: 6, luggage_capacity: 8, status: 'AVAILABLE' },
+        { id: 'cab-005', cab_number: 'DL-05-IJ-7890', cab_type: 'Hatchback', no_of_seats: 2, luggage_capacity: 2, status: 'AVAILABLE' },
     ]
 
-    console.log('\nSeeding cabs...')
+    console.log('\n Seeding cabs...')
     for (let i = 0; i < cabs.length; i++) {
         const cab = cabs[i]!
         const driver = createdDrivers[i]!
