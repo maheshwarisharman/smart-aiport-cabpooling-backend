@@ -1,8 +1,8 @@
-# 🛫 Smart Airport Cab-Pooling — Backend
+# Smart Airport Cab-Pooling — Backend
 
 A real-time airport cab-pooling backend that matches passengers heading in similar directions using **H3 geo-indexing**, **Redis**, and **WebSockets**. Built with **Bun**, **Express**, **Prisma**, and **PostgreSQL**.
 
-> **📖 Full API Reference →** open `docs/index.html` in your browser or see [`openapi.yaml`](./openapi.yaml)
+> **Full API Reference** → open `docs/index.html` in your browser or see [`openapi.yaml`](./openapi.yaml)
 
 ---
 
@@ -18,7 +18,7 @@ A real-time airport cab-pooling backend that matches passengers heading in simil
 
 ---
 
-## 🐳 Run with Docker (Recommended)
+## Run with Docker (Recommended)
 
 > One command spins up **Postgres + Redis + App** with auto-migrations and seed data.
 
@@ -41,7 +41,7 @@ The Dockerfile uses a **multi-stage build** — Stage 1 installs all deps and ge
 
 ---
 
-## 🖥️ Run Locally (without Docker)
+## Run Locally (without Docker)
 
 ### Prerequisites
 
@@ -75,7 +75,7 @@ The HTTP server will be at **http://localhost:3000** and the WebSocket server at
 
 ---
 
-## 🧪 Quick Testing Guide
+## Quick Testing Guide
 
 The project ships with **`testData.ts`** — ready-made payloads using the seeded user/driver IDs.
 
@@ -119,7 +119,7 @@ curl -X POST http://localhost:3000/find-ride/trips \
 
 ---
 
-## 📂 Database Schema
+## Database Schema
 
 The core logic revolves around **Trips** (a session of a cab ride) and **RideRequests** (passengers joining that trip).
 
@@ -133,41 +133,41 @@ erDiagram
     Users {
         String id PK
         String name
-        String email
+        String email UK
         String password
+        DateTime createdAt
         String gender
         Int age
         Int ride_otp
         DateTime otp_expiry
-        DateTime createdAt
     }
 
     Drivers {
         String id PK
         String name
-        String email
+        String email UK
         String password
+        DateTime createdAt
         String gender
         Int age
-        DateTime createdAt
     }
 
     Cabs {
         String id PK
-        String cab_number
+        String cab_number UK
         String cab_type
         Int no_of_seats
         Int luggage_capacity
         String status
-        String driver_id FK
+        String driver_id FK UK
     }
 
     Trips {
         String id PK
         String status
+        Int fare_each
         Int no_of_passengers
         Int total_luggage
-        Int fare_each
         DateTime created_at
         String cab_id FK
     }
@@ -179,14 +179,14 @@ erDiagram
         Int luggage_capacity
         Int issued_price
         DateTime joined_at
-        String trip_id FK
         String user_id FK
+        String trip_id FK
     }
 ```
 
 ---
 
-## 🧩 Ride Matching Algorithm
+## Ride Matching Algorithm
 
 The matching logic is implemented in `src/rideMatching/demo.js` (prototype) and `src/utils/redisCaching.ts` (production). It uses **H3 (Hexagonal Hierarchical Spatial Index)** to treat routes as strings of characters.
 
@@ -222,7 +222,7 @@ The matching logic is implemented in `src/rideMatching/demo.js` (prototype) and 
 
 ---
 
-## ⚡ Concurrency Handling Strategy
+## Concurrency Handling Strategy
 
 Ride matching involves heavy array manipulation and string processing (looping over H3 indices, comparing 15-char substrings). Running this on the **Node.js/Bun main thread** would block the Event Loop, causing lag for HTTP/WebSocket requests.
 
@@ -241,7 +241,7 @@ We use a custom **Worker Pool** (`src/workers/workerPool.ts`) to offload CPU-int
 
 ---
 
-## 💰 Pricing Approach
+## Pricing Approach
 
 Located in `src/utils/redisCaching.ts`.
 
