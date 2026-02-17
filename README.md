@@ -8,6 +8,8 @@ A real-time airport cab-pooling backend that matches passengers heading in simil
 
 ## Architecture at a Glance
 
+![High Level Architecture](./docs/architecture_flow.png)
+
 | Layer | Tech | Port |
 |---|---|---|
 | HTTP API | Express 5 | `3000` |
@@ -21,6 +23,9 @@ A real-time airport cab-pooling backend that matches passengers heading in simil
 ## Run with Docker (Recommended)
 
 > One command spins up **Postgres + Redis + App** with auto-migrations and seed data.
+
+#Important: Make sure to update the .env file GOOGLE_ROUTES_API_KEY. 
+(see .env.example for reference)
 
 ```bash
 # Build & start (foreground)
@@ -186,11 +191,16 @@ erDiagram
 
 ---
 
-## Ride Matching Algorithm
+## Ride Matching Strategy (Low Level Design)
 
-The matching logic is implemented in `src/rideMatching/demo.js` (prototype) and `src/utils/redisCaching.ts` (production). It uses **H3 (Hexagonal Hierarchical Spatial Index)** to treat routes as strings of characters.
+The matching logic is implemented in `src/utils/redisCaching.ts` and runs on worker threads to prevent blocking the main event loop. It uses **H3 (Hexagonal Hierarchical Spatial Index)** to treat routes as strings of characters, enabling efficient prefix-based matching in Redis.
 
-### Approach
+![High Level Architecture](./docs/1.png)
+![High Level Architecture](./docs/2.png)
+![High Level Architecture](./docs/3.png)
+
+
+### Core Concept: Route Linearization
 
 1.  **Route Digitization**:
     *   Fetch route points (Polyline) from **Google Routes API**.
@@ -202,23 +212,55 @@ The matching logic is implemented in `src/rideMatching/demo.js` (prototype) and 
     *   Stores route signatures in a Lexicographically Sorted Set (`ZSET`).
     *   Key: `h3:airport_pool`
     *   Member: `route_signature::user_id`
+    *   Score: `0` (we rely purely on lexicographical ordering).
 
-3.  **Matching Logic**:
-    *   **Exact/Subset Match**: Uses `ZRANGE` with lexicographical search (`[signature`) to find users whose route contains or is contained by the current user's route.
-    *   **Split-Point Analysis (Detour)**:
-        *   Finds the **Longest Common Prefix** (shared route segment) between two candidates.
-        *   Calculates the **Split Point** (where they diverge).
-        *   Computes the "Detour Distance" (distance from Split Point → Candidate Destination).
-        *   **Condition**: If `Detour < Threshold`, it's a match.
+### Matching Steps
 
-### Complexity Analysis
+The algorithm performs a two-step search to find the best candidate:
 
-*   **Google API**: $O(1)$ (External latency).
-*   **H3 Conversion**: $O(N)$ where $N$ is the number of route points.
-*   **Redis Insertion**: $O(\log K)$ where $K$ is the number of active users in the pool.
-*   **Matching Query**:
-    *   The lexicographical scan is efficient: $O(\log K + M)$ where $M$ is the number of matches found.
-    *   The "Split Point" string comparison runs in $O(L)$ where $L$ is the route string length.
+#### Step 1: Geometric Overlap (The "Fast Path")
+We look for candidates whose routes are geometrically aligned with ours using Redis `ZRANGE` with `BY: LEX`.
+
+*   **Superset Match (You contain me)**:
+    *   We search for routes that **start with** our route signature.
+    *   Query: `ZRANGE [my_route_signature` to `[my_route_signature\xff`
+    *   *Logic*: If a candidate's string starts with my string, their route is a continuation of mine. I can drop them off first.
+
+*   **Subset Match (I contain you)**:
+    *   We search for routes that are **prefixes** of our route signature.
+    *   Query: We check immediate neighbors (predecessors and successors) in the sorted set.
+    *   *Logic*: If my string starts with a candidate's string, my route covers their entire path. I can pick them up and drop them off on my way.
+
+#### Step 2: Split-Point & Detour Analysis (The "Smart Path")
+If no perfect overlap is found, we analyze nearby candidates to see if a slight detour is viable.
+
+1.  **Find Candidates**: Fetch nearest neighbors in the sorted set (lexicographically similar routes).
+2.  **Find Split Point**:
+    *   Compare the user's route string with the candidate's.
+    *   Identify the **Longest Common Prefix**—this represents the shared portion of the journey.
+    *   The point where the strings diverge is the **Split Point**.
+3.  **Calculate Detour**:
+    *   Extract the H3 index of the Split Point.
+    *   Extract the H3 index of the Candidate's Destination.
+    *   Calculate the **real-world driving distance** from Split Point → Candidate Destination using Google Routes API.
+4.  **Threshold Check**:
+    *   If `Detour Distance < 3 km`, it's a match!
+    *   We select the candidate with the minimal detour.
+
+### Persistence & Consistency
+
+Once a match is identified in Redis:
+
+1.  **Atomic Cleanup**:
+    *   The two users are removed from the available pool (`ZREM`, `DEL`).
+    *   A temporary `TRIP...` key is created in Redis with the combined metadata.
+2.  **Price Adjustment**:
+    *   A **70% discount** is applied to *both* users' original issued prices.
+3.  **DB Transaction**:
+    *   A Prisma Interactive Transaction (`prisma.$transaction`) creates a `Trips` row and two `RideRequests` rows in PostgreSQL.
+    *   This ensures that either the entire match is persisted, or (in rare failures) rolled back to avoid data inconsistency.
+4.  **Notification**:
+    *   The match details are published via **Redis Pub/Sub** to notify the WebSocket server, which pushes the update to the connected clients.
 
 ---
 
