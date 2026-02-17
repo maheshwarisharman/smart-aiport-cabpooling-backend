@@ -137,14 +137,19 @@ erDiagram
         String password
         String gender
         Int age
+        Int ride_otp
+        DateTime otp_expiry
+        DateTime createdAt
     }
 
     Drivers {
         String id PK
         String name
         String email
+        String password
         String gender
         Int age
+        DateTime createdAt
     }
 
     Cabs {
@@ -152,23 +157,28 @@ erDiagram
         String cab_number
         String cab_type
         Int no_of_seats
+        Int luggage_capacity
         String status
         String driver_id FK
     }
 
     Trips {
         String id PK
-        String status "WAITING|ACTIVE|COMPLETED"
+        String status
         Int no_of_passengers
         Int total_luggage
         Int fare_each
-        String cab_id FKRef
+        DateTime created_at
+        String cab_id FK
     }
 
     RideRequests {
         String id PK
         String status
+        Int no_of_passengers
+        Int luggage_capacity
         Int issued_price
+        DateTime joined_at
         String trip_id FK
         String user_id FK
     }
